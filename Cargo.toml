@@ -1,0 +1,26 @@
+[package]
+name = "tspss"
+version = "0.1.0"
+edition = "2021"
+license = "Apache-2.0 OR MIT"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+crossterm = "0.18"
+nanorand="0.4"
+anyhow = "1"
+thiserror = "1"
+bitflags = "1"
+log = "^0.4.0"
+unicode-width = "0.1.5"
+dirs = "1"
+toml = "0.5"
+serde = "1"
+serde_derive = "1"
+getopts = "0.2"
+bincode = "1"
+simplelog = "0.7"
+
+[profile.release]
+strip = "debuginfo"
