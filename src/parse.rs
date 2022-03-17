@@ -1,6 +1,7 @@
 use std::char;
 use std::f64;
 use std::convert::TryFrom;
+use std::fmt;
 
 use anyhow::{anyhow, Result};
 
@@ -20,6 +21,17 @@ pub enum Range {
     Multi(Pos, Pos), // something selected
     Row(usize), // entire row
     Col(usize), // entire col
+}
+
+impl fmt::Display for Range {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Range::Single(p) => write!(f, "{}{}", idx_to_name(p.col), p.row+1),
+            Range::Multi(p1, p2) => write!(f, "{}{}:{}{}", idx_to_name(p1.col), p1.row+1, idx_to_name(p2.col), p2.row+1),
+            Range::Col(c) => write!(f, "COL {}", idx_to_name(*c)),
+            Range::Row(r) => write!(f, "ROW {}", *r),
+        }
+    }
 }
 
 fn inc_char(inc: usize) -> char {
@@ -176,7 +188,7 @@ pub fn parse_ident(s: &str) -> (&str, String) {
 }
 
 fn parse_coord(s: &str) -> Result<(&str, Pos)> {
-    // println!("IN: {}", s);
+    // info!("IN: {}", s);
     let mut c = Pos::default();
     // $?
     let (st, ok) = parse_literal(s, "$");
@@ -639,7 +651,7 @@ mod buf_test {
             let r = parse_int(test.st);
             if test.err {
                 if let Ok((_s, ii)) = r {
-                    println!("{} == {}", test.st, ii);
+                    info!("{} == {}", test.st, ii);
                 }
                 assert!(r.is_err(), "{}", test.st);
             } else {
@@ -677,7 +689,7 @@ mod buf_test {
             let r = parse_float(test.st);
             if test.err {
                 if let Ok((_s, v)) = r {
-                    println!("[{}] --> [{}]", test.st, v);
+                    info!("[{}] --> [{}]", test.st, v);
                 }
                 assert!(r.is_err(), "{}", test.st);
             } else {
@@ -707,7 +719,7 @@ mod buf_test {
             let r = parse_string(test.st);
             if test.err {
                 if let Ok((_s, ref v)) = r {
-                    println!("[{}] --> [{}]", test.st, v);
+                    info!("[{}] --> [{}]", test.st, v);
                 }
                 assert!(r.is_err(), "{}", test.st);
             } else {
@@ -761,12 +773,12 @@ mod buf_test {
             let r = parse_arg(test.st);
             if test.err {
                 if let Ok((_s, ref val)) = r {
-                    println!("Must be ERROR [{}]: {:?}", test.st, val);
+                    info!("Must be ERROR [{}]: {:?}", test.st, val);
                 }
                 assert!(r.is_err());
             } else {
                 if r.is_err() {
-                    println!("Must be OK: [{}]: {:?}", test.st, r);
+                    info!("Must be OK: [{}]: {:?}", test.st, r);
                 }
                 let (_s, val) = r.unwrap();
                 assert_eq!(val, test.rs, "{:?}", test.st);

@@ -35,6 +35,7 @@ pub enum Transition {
     Pop(Msg), // Close the last dialog, Msg contains the DialogResult
     Exit, // Exit app
     Push(Dialog), // Create a new dialog with type Dialog
+    TempSelect, // Start selection - limited mode which allows a user only selecting and escaping a range
 }
 
 pub struct Context {

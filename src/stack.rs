@@ -93,7 +93,7 @@ pub fn expr_to_stack(args: &[Arg]) -> Result<Vec<Arg>> {
             },
             Arg::Func(name, _) => {
                 let cnt = if lookup_func_arg(args, idx+1) { 1 } else { 0 };
-                println!("{}: {} args", name, cnt);
+                info!("{}: {} args", name, cnt);
                 stack.push(Arg::Func(name.to_string(), cnt));
                 is_last_op = false;
             },
@@ -213,7 +213,7 @@ mod buf_test {
             let r = expr_to_stack(&s);
             if t.err {
                 if r.is_ok() {
-                    println!("response for [{}]: {:?}", t.val, r);
+                    info!("response for [{}]: {:?}", t.val, r);
                 }
                 assert!(r.is_err(), "{}", t.val);
             } else {

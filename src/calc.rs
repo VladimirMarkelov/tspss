@@ -127,12 +127,7 @@ impl Calc {
         let sheet = &self.sheets[self.sheet];
         let (col, row) = (sheet.cursor.col, sheet.cursor.row);
         let cell = sheet.cell(col, row);
-        let addr = match sheet.selected_range() {
-            Range::Single(p) => format!("{}{}", idx_to_name(p.col), p.row+1),
-            Range::Multi(p1, p2) => format!("{}{}:{}{}", idx_to_name(p1.col), p1.row+1, idx_to_name(p2.col), p2.row+1),
-            Range::Col(c) => format!("COL {}", idx_to_name(c)),
-            Range::Row(r) => format!("ROW {}", r),
-        };
+        let addr = format!("{}", sheet.selected_range());
         let title = format!("[{}][{}]{}", sheet.name, addr, cell.val);
         let w = title.width();
         let title = title + &" ".repeat(self.w as usize - w);
@@ -145,6 +140,7 @@ impl Calc {
         match self.sheets[self.sheet].mode {
             CalcMode::Edit => scr.write_string("=", 0, ctx.h -1),
             CalcMode::Command => scr.write_string(":", 0, ctx.h -1),
+            CalcMode::TempSelect | CalcMode::TempSelectStart => scr.write_string("@", 0, ctx.h - 1),
             _ => {},
         }
         Ok(())
@@ -270,6 +266,18 @@ impl Calc {
             _ => Transition::None,
         }
     }
+    fn enable_temp_range_mode(&mut self, scr: &mut Screen) -> Transition {
+        let mode = self.sheets[self.sheet].mode;
+        match mode {
+            CalcMode::Edit => {
+                let sheet = &mut self.sheets[self.sheet];
+                sheet.mode = CalcMode::TempSelect;
+                self.on_activate(scr);
+                Transition::None
+            },
+            _ => Transition::None,
+        }
+    }
     fn process_enter(&mut self, scr: &mut Screen, modifiers: KeyModifiers) -> Transition {
         // TODO: return if selected more than 1 cell
         let mode = self.sheets[self.sheet].mode;
@@ -311,6 +319,18 @@ impl Calc {
                 Transition::None
             },
             CalcMode::TempSelect => {
+                let sheet = &mut self.sheets[self.sheet];
+                sheet.mode = CalcMode::Edit;
+                let rng = format!("{}", sheet.selected_range());
+                self.ed_top.insert(&rng);
+                Transition::None
+            },
+            CalcMode::TempSelectStart => {
+                let sheet = &mut self.sheets[self.sheet];
+                sheet.mode = CalcMode::Edit;
+                sheet.finish_select();
+                let rng = format!("{}", sheet.selected_range());
+                self.ed_top.insert(&rng);
                 Transition::None
             },
         }
@@ -324,12 +344,23 @@ impl Calc {
                     self.err = None;
                 }
                 match ev.code {
-                    KeyCode::Esc => if let CalcMode::Move = sheet.mode {
-                        Transition::EventPass
-                    } else {
-                        // TODO: clear selection range
-                        sheet.cancel_select();
-                        Transition::None
+                    KeyCode::Esc => match sheet.mode {
+                        CalcMode::Move => {
+                            Transition::EventPass
+                        },
+                        CalcMode::TempSelect => {
+                            self.ed_top.on_activate(scr);
+                            Transition::None
+                        },
+                        CalcMode::TempSelectStart => {
+                            sheet.cancel_select();
+                            self.ed_top.on_activate(scr);
+                            Transition::None
+                        },
+                        _ => {
+                            sheet.cancel_select();
+                            Transition::None
+                        },
                     },
                     KeyCode::Left => sheet.arrow_left(ev.modifiers),
                     KeyCode::Right => sheet.arrow_right(ev.modifiers),
@@ -546,7 +577,7 @@ impl Widget for Calc {
         self.draw_cells(ctx, scr)?;
         self.draw_mode(ctx, scr)?;
         match  self.sheets[self.sheet].mode {
-            CalcMode::Edit => self.ed_top.draw(ctx, scr),
+            CalcMode::Edit | CalcMode::TempSelect | CalcMode::TempSelectStart => self.ed_top.draw(ctx, scr),
             CalcMode::Command => self.ed_bottom.draw(ctx, scr),
             _ => self.show_info(ctx, scr),
         }
@@ -560,7 +591,9 @@ impl Widget for Calc {
         } else {
             Transition::EventPass
         };
-        if let Transition::EventPass = ev {
+        if let Transition::TempSelect = ev {
+            Ok(self.enable_temp_range_mode(scr))
+        } else if let Transition::EventPass = ev {
             self.process_event_inner(ctx, scr, event)
         } else {
             Ok(ev)

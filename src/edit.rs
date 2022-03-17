@@ -43,7 +43,7 @@ impl Edit {
             self.text.clone()
         }
     }
-    fn insert(&mut self, txt: &str) {
+    pub fn insert(&mut self, txt: &str) {
         // TODO: too many u16/usize conversions
         let mx = self.text.width() as u16;
         let w = txt.width();
@@ -179,6 +179,13 @@ impl Widget for Edit {
                         },
                         'p' => {/* TODO: insert from clipboard? or marked range? */},
                         _=> {},
+                    }
+                } else if ev.modifiers == KeyModifiers::ALT {
+                    match c {
+                        's' => {
+                            return Ok(Transition::TempSelect); // TODO: do it only for edit, not for command
+                        },
+                        _ => {},
                     }
                 },
                 _ => {},

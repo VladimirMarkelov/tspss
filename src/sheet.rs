@@ -35,6 +35,7 @@ pub enum CalcMode {
     Select,
     Command,
     TempSelect,
+    TempSelectStart,
 }
 #[derive(Copy,Clone,Debug)]
 pub enum Align {
@@ -876,7 +877,7 @@ impl Sheet {
         }
     }
     pub fn start_select(&mut self, tp: SelectType) {
-        self.mode = CalcMode::Select;
+        self.mode = if let CalcMode::Move = self.mode { CalcMode::Select } else { CalcMode::TempSelectStart };
         self.select_start = Some(Pos::new(self.cursor.col, self.cursor.row));
         self.select_end = None;
         self.select_type = tp;
@@ -885,7 +886,7 @@ impl Sheet {
         self.select_end = Some(Pos::new(self.cursor.col, self.cursor.row));
     }
     pub fn cancel_select(&mut self) {
-        self.mode = CalcMode::Move;
+        self.mode = if let CalcMode::TempSelectStart = self.mode { CalcMode::Edit } else { CalcMode::Move };
         self.select_start = None;
         self.select_end = None;
     }
