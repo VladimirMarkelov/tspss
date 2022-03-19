@@ -18,6 +18,7 @@ use crate::parse::{Range, idx_to_name, MAX_COLS, MAX_ROWS, DEF_NUM_WIDTH};
 use crate::ops::{err_msg};
 
 const MAIN_WIDGET: &str = "calc";
+const MAX_PAGES: usize = 100; // TODO:
 
 pub struct Calc {
     name: String,
@@ -508,6 +509,37 @@ impl Calc {
             "nofixcol" => {
                 let mut sheet = &mut self.sheets[self.sheet];
                 sheet.unfix_col();
+            },
+            "newpage" => {
+                if self.sheets.len() >= MAX_PAGES {
+                    self.err = Some("too many pages".to_string());
+                    return false;
+                }
+                let mut name = args.trim(); // TODO: validate page name
+                let mut idx = 1;
+                if name.is_empty() {
+                    // TODO: optimize
+                    for i in 0..MAX_PAGES {
+                        let pn = format!("page{}", i+1);
+                        let mut found = false;
+                        for s in &self.sheets {
+                            if s.name == pn {
+                                found = true;
+                                break;
+                            }
+                        }
+                        if !found {
+                            idx = i;
+                            break;
+                        }
+                    }
+                }
+                let mut sheet = Sheet::new(idx, self.w, self.h);
+                if !name.is_empty() {
+                    sheet.name = name.to_string();
+                }
+                self.sheets.push(sheet);
+                self.sheet = self.sheets.len() - 1;
             },
             _ => {
                 self.err = Some(format!("invalid command '{}'", command));
