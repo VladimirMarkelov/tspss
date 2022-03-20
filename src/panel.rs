@@ -59,4 +59,5 @@ impl Widget for Panel {
     fn set_gen(&mut self, gen: usize) { self.gen = gen; }
     fn show(&mut self) { self.visible = true; }
     fn hide(&mut self) { self.visible = false; }
+    fn on_command(&mut self, _cmd: Msg) -> Result<Transition> { Ok(Transition::EventPass) }
 }

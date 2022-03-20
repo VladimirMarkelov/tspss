@@ -10,7 +10,7 @@ use unicode_width::UnicodeWidthStr;
 use bincode::{serialize_into, deserialize_from};
 
 use crate::primitive::Screen;
-use crate::ui::{Widget,Context,Transition,NOTHING,MAIN_WIDGET,Dialog,PageListArgs};
+use crate::ui::{Widget,Context,Transition,NOTHING,MAIN_WIDGET,Dialog,PageListArgs,Msg,Command};
 use crate::edit::Edit;
 use crate::strs;
 use crate::sheet::{Sheet, CalcMode, VERSION};
@@ -527,6 +527,10 @@ impl Calc {
                 sheet.unfix_col();
             },
             "newpage" => {
+                {
+                    let mut sheet = &mut self.sheets[self.sheet];
+                    sheet.mode = CalcMode::Move;
+                }
                 if self.sheets.len() >= MAX_PAGES {
                     self.err = Some("too many pages".to_string());
                     return Transition::None;
@@ -666,4 +670,22 @@ impl Widget for Calc {
     fn set_gen(&mut self, gen: usize) { self.gen = gen; }
     fn show(&mut self) {}
     fn hide(&mut self) {}
+    fn on_command(&mut self, msg: Msg) -> Result<Transition> {
+        info!("Calc got command: {:?}", msg);
+        match msg {
+            Msg::Cmd(cmd) => {
+                match cmd {
+                    Command::Page_ID(id) => {
+                        if id >= self.sheets.len() {
+                            return Err(anyhow!("Page index is too big: {} of {}", id, self.sheets.len()));
+                        }
+                        self.sheet = id;
+                        Ok(Transition::None)
+                    },
+                    _ => Err(anyhow!("unsupported command: {:?}", cmd)),
+                }
+            },
+            _ => Err(anyhow!("unsupported message type: {:?}", msg)),
+        }
+    }
 }

@@ -3,7 +3,7 @@ use crossterm::{ style::{ Color} };
 use crossterm::event::{KeyCode, Event};
 
 use crate::primitive::Screen;
-use crate::ui::{Widget,Context,Transition};
+use crate::ui::{Widget,Context,Transition,Msg};
 
 pub struct Label {
     name: String,
@@ -56,4 +56,5 @@ impl Widget for Label {
     fn set_gen(&mut self, gen: usize) { self.gen = gen; }
     fn show(&mut self) { self.visible = true; }
     fn hide(&mut self) { self.visible = false; }
+    fn on_command(&mut self, _cmd: Msg) -> Result<Transition> { Ok(Transition::EventPass) }
 }

@@ -29,7 +29,7 @@ pub enum Dialog {
 #[derive(Debug,Copy,Clone)]
 pub enum Command {
     None,
-    ID(usize),
+    Page_ID(usize),
 }
 
 #[derive(Debug,Clone)]
@@ -77,6 +77,7 @@ pub trait Widget {
     fn set_gen(&mut self, gen: usize);
     fn hide(&mut self);
     fn show(&mut self);
+    fn on_command(&mut self, cmd: Msg) -> Result<Transition>;
 }
 
 pub struct WidgetStack {
@@ -232,10 +233,11 @@ impl WidgetStack {
                     if self.is_main_dlg() {
                         // self.focus_next(scr)?; // TODO: remember previously focused
                         self.set_focus(MAIN_WIDGET, scr)?;
+                        self.pass_command(MAIN_WIDGET, msg)?; // TODO: use transition or make it Result<()>?
                     }
-                    match msg {
-                        _ => {}, // TODO: process dialog close events and update other widgets
-                    }
+                    // match msg {
+                    //     _ => {}, // TODO: process dialog close events and update other widgets
+                    // }
                     Ok(Transition::None)
                 }
             },
@@ -270,7 +272,7 @@ impl WidgetStack {
                         let lbl = Box::new(Label::new(ctx, "lbl", posx+1, posy, Color::White, Color::Black, &args.title)); // TODO: cut title if long
                         let mut lbx = Box::new(ListBox::new(ctx, "lbx", posx+1, posy+1, w-2, h-2, Color::DarkBlue, Color::Blue));
                         for (idx, item) in args.items.iter().enumerate() {
-                            lbx.push_item(ListItem::new(item, Command::ID(idx)));
+                            lbx.push_item(ListItem::new(item, Command::Page_ID(idx)));
                         }
                         lbx.set_selected(selected);
                         self.next_gen();
@@ -310,6 +312,19 @@ impl WidgetStack {
             return Err(anyhow!("Widget {} not found", name));
         }
         Ok(())
+    }
+    fn pass_command(&mut self, name: &str, cmd: Msg) -> Result<Transition> {
+        let gen = self.last_gen();
+        if gen == NOTHING {
+            return Err(anyhow!("no dialogs"));
+        }
+        for (idx, w) in self.widgets.iter_mut().enumerate() {
+            if w.gen() != gen || w.name() != name {
+                continue;
+            }
+            return w.on_command(cmd);
+        }
+        Err(anyhow!("Widget {} not found", name))
     }
 }
 
