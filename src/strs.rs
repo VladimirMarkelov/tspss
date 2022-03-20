@@ -3,6 +3,7 @@ use unicode_width::UnicodeWidthStr;
 
 const UNLIM: usize = -1i64 as usize;
 
+// TODO: optimize - accept and return &str
 pub fn cut(s: &str, start: usize, len: usize) -> String {
     let w= s.width();
     if start == 0 && w<= len {
@@ -37,6 +38,7 @@ pub fn cut(s: &str, start: usize, len: usize) -> String {
     s.get(first..end).unwrap().to_string()
 }
 
+// TODO: optimize - accept and return &str
 pub fn center(s: &str, width: usize) -> String {
     let w = s.width();
     if w == width {
@@ -75,6 +77,7 @@ pub fn center(s: &str, width: usize) -> String {
     s.get(first..end).unwrap().to_string()
 }
 
+// TODO: optimize - accept and return &str
 pub fn right(s: &str, width: usize) -> String {
     if s.is_empty() {
         return String::new();

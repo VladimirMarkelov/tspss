@@ -13,7 +13,7 @@ use crate::primitive::Screen;
 use crate::ui::{Widget,Context,Transition,NOTHING,MAIN_WIDGET,Dialog,PageListArgs,Msg,Command};
 use crate::edit::Edit;
 use crate::strs;
-use crate::sheet::{Sheet, CalcMode, VERSION};
+use crate::sheet::{Sheet, CalcMode, VERSION, Align};
 use crate::parse::{Range, idx_to_name, MAX_COLS, MAX_ROWS, DEF_NUM_WIDTH};
 use crate::ops::{err_msg};
 
@@ -163,14 +163,26 @@ impl Calc {
                         let attr = sheet.cell_attr(c, r);
                         let cell = sheet.cell(c, r);
                         scr.colors(attr.fg, attr.bg);
-                        // TODO: align
+                        let align = cell.align();
                         let mut title = cell.title();
-                        if !title.is_empty() {
-                            title = strs::cut(&title, 0, cwidth.into());
-                        }
+                        let l = title.width();
+                        // TODO: eliminate duplicated code for alignment
+                        title = match align {
+                            Align::Left => strs::cut(&title, 0, cwidth.into()),
+                            Align::Right => if cell.is_number() && l > cwidth as usize { strs::cut(&title, 0, cwidth.into()) } else { strs::right(&title, cwidth.into()) },
+                            Align::Center => strs::center(&title, cwidth.into()),
+                        };
                         let l = title.width();
                         if l < cwidth.into() {
-                            title = title + &" ".repeat(cwidth as usize - l);
+                            // TODO: optimize when double pass is implemented
+                            match align {
+                                Align::Left => title = title + &" ".repeat(cwidth as usize - l),
+                                Align::Right => title = " ".repeat(cwidth as usize - l) + &title,
+                                Align::Center => {
+                                    let lf = (l-cwidth as usize)/2;
+                                    title = " ".repeat(lf) + &title + &" ".repeat(cwidth as usize - lf);
+                                },
+                            }
                         }
                         scr.write_string(&title, colpos, rowpos);
                         colpos += cwidth;
@@ -182,13 +194,24 @@ impl Calc {
                     let cell = sheet.cell(c, r);
                     scr.colors(attr.fg, attr.bg);
                     // TODO: align
+                    let align = cell.align();
                     let mut title = cell.title();
-                    if !title.is_empty() {
-                        title = strs::cut(&title, 0, cwidth.into());
-                    }
+                    let l = title.width();
+                    title = match align {
+                        Align::Left => strs::cut(&title, 0, cwidth.into()),
+                        Align::Right => if cell.is_number() && l > cwidth as usize { strs::cut(&title, 0, cwidth.into()) } else { strs::right(&title, cwidth.into()) },
+                        Align::Center => strs::center(&title, cwidth.into()),
+                    };
                     let l = title.width();
                     if l < cwidth.into() {
-                        title = title + &" ".repeat(cwidth as usize - l);
+                        match align {
+                            Align::Left => title = title + &" ".repeat(cwidth as usize - l),
+                            Align::Right => title = " ".repeat(cwidth as usize - l) + &title,
+                            Align::Center => {
+                                let lf = (l-cwidth as usize)/2;
+                                title = " ".repeat(lf) + &title + &" ".repeat(cwidth as usize - lf);
+                            },
+                        }
                     }
                     scr.write_string(&title, colpos, rowpos);
                     colpos += cwidth;
@@ -211,13 +234,24 @@ impl Calc {
                     let cell = sheet.cell(c, r);
                     scr.colors(attr.fg, attr.bg);
                     // TODO: align
+                    let align = cell.align();
                     let mut title = cell.title();
-                    if !title.is_empty() {
-                        title = strs::cut(&title, 0, cwidth.into());
-                    }
+                    let l = title.width();
+                    title = match align {
+                        Align::Left => strs::cut(&title, 0, cwidth.into()),
+                        Align::Right => if cell.is_number() && l > cwidth as usize { strs::cut(&title, 0, cwidth.into()) } else { strs::right(&title, cwidth.into()) },
+                        Align::Center => strs::center(&title, cwidth.into()),
+                    };
                     let l = title.width();
                     if l < cwidth.into() {
-                        title = title + &" ".repeat(cwidth as usize - l);
+                        match align {
+                            Align::Left => title = title + &" ".repeat(cwidth as usize - l),
+                            Align::Right => title = " ".repeat(cwidth as usize - l) + &title,
+                            Align::Center => {
+                                let lf = (l-cwidth as usize)/2;
+                                title = " ".repeat(lf) + &title + &" ".repeat(cwidth as usize - lf);
+                            },
+                        }
                     }
                     scr.write_string(&title, colpos, rowpos);
                     colpos += cwidth;
@@ -229,13 +263,24 @@ impl Calc {
                 let cell = sheet.cell(c, r);
                 scr.colors(attr.fg, attr.bg);
                 // TODO: align
+                let align = cell.align();
                 let mut title = cell.title();
-                if !title.is_empty() {
-                    title = strs::cut(&title, 0, cwidth.into());
-                }
+                let l = title.width();
+                title = match align {
+                    Align::Left => strs::cut(&title, 0, cwidth.into()),
+                    Align::Right => if cell.is_number() && l > cwidth as usize { strs::cut(&title, 0, cwidth.into()) } else { strs::right(&title, cwidth.into()) },
+                    Align::Center => strs::center(&title, cwidth.into()),
+                };
                 let l = title.width();
                 if l < cwidth.into() {
-                    title = title + &" ".repeat(cwidth as usize - l);
+                    match align {
+                        Align::Left => title = title + &" ".repeat(cwidth as usize - l),
+                        Align::Right => title = " ".repeat(cwidth as usize - l) + &title,
+                        Align::Center => {
+                            let lf = (l-cwidth as usize)/2;
+                            title = " ".repeat(lf) + &title + &" ".repeat(cwidth as usize - lf);
+                        },
+                    }
                 }
                 scr.write_string(&title, colpos, rowpos);
                 colpos += cwidth;

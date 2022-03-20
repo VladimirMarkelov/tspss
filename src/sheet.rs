@@ -229,6 +229,19 @@ impl Default for Cell {
 
 impl Cell {
     pub fn is_expr(&self) -> bool { self.val.starts_with('=') }
+    pub fn is_number(&self) -> bool {
+        if let Arg::Number(_) = self.calculated { true } else { false }
+    }
+    pub fn align(&self) -> Align {
+        match self.attr.align {
+            Some(a) => a,
+            None => if self.is_number() {
+                Align::Right
+            } else {
+                Align::Left
+            },
+        }
+    }
     pub fn title(&self) -> String {
         if self.err != 0 {
             return err_msg(self.err).to_string();
