@@ -155,7 +155,7 @@ impl Widget for Edit {
                 KeyCode::Enter => if let Dialog::None = self.command {
                     return Ok(Transition::EventPass);
                 } else {
-                    return Ok(Transition::Pop(Msg::Ok(self.command)));
+                    return Ok(Transition::Pop(Msg::Ok(self.command.clone())));
                 },
                 KeyCode::Char(c) => if ev.modifiers == KeyModifiers::NONE || ev.modifiers == KeyModifiers::SHIFT {
                     if self.text.width() >= MAX_CELL_LEN {

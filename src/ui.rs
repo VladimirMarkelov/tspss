@@ -2,19 +2,34 @@ use std::collections::HashMap;
 
 use anyhow::{anyhow, Result};
 use crossterm::event::{Event, KeyCode};
+use unicode_width::UnicodeWidthStr;
+use crossterm::style::{Color};
 
 use crate::primitive::Screen;
+use crate::panel::Panel;
+use crate::listbox::{ListBox, ListItem};
+use crate::label::Label;
 
+pub const MAIN_WIDGET: &str = "calc";
 pub const NOTHING: usize = -1i64 as usize;
 
-#[derive(Debug,Copy,Clone)]
+#[derive(Clone,Debug)]
+pub struct PageListArgs {
+    pub items: Vec<String>,
+    pub default: String,
+    pub title: String,
+}
+
+#[derive(Debug,Clone)]
 pub enum Dialog {
     None,
+    PageList(PageListArgs),
 }
 
 #[derive(Debug,Copy,Clone)]
 pub enum Command {
-    None
+    None,
+    ID(usize),
 }
 
 #[derive(Debug,Clone)]
@@ -123,8 +138,9 @@ impl WidgetStack {
         if gen == NOTHING {
             return;
         }
-        self.focused = NOTHING; // TODO: remeber previously focused
+        self.focused = NOTHING; // TODO: remember previously focused
         self.widgets.retain(|w| w.gen() < gen);
+        self.gen -= 1;
     }
     // Move focus to the next widget in the current dialog. Return true if the focus changed.
     // TODO: optimize?
@@ -196,6 +212,10 @@ impl WidgetStack {
                         } else {
                             self.last_result.clear();
                             self.pop();
+                            if self.is_main_dlg() {
+                                // self.focus_next(scr)?; // TODO: remember previously focused
+                                self.set_focus(MAIN_WIDGET, scr)?;
+                            }
                             return Ok(Transition::None);
                         }
                     }
@@ -209,6 +229,10 @@ impl WidgetStack {
                 } else {
                     self.save_result();
                     self.pop();
+                    if self.is_main_dlg() {
+                        // self.focus_next(scr)?; // TODO: remember previously focused
+                        self.set_focus(MAIN_WIDGET, scr)?;
+                    }
                     match msg {
                         _ => {}, // TODO: process dialog close events and update other widgets
                     }
@@ -217,6 +241,46 @@ impl WidgetStack {
             },
             Transition::Push(dlg) => {
                 info!("New dialog {:?}", dlg);
+                match dlg {
+                    Dialog::PageList(args) => {
+                        if args.items.is_empty() {
+                            return Err(anyhow!(format!("list for '{}' is empty", args.title)));
+                        }
+                        info!("select a page from list");
+                        let mut mx = args.title.width();
+                        let mut selected: usize = 0;
+                        for (idx,item) in args.items.iter().enumerate() {
+                            let w = item.width();
+                            if w > mx {
+                                mx = w;
+                            }
+                            if item.as_str() == args.default.as_str() {
+                                selected = idx;
+                            }
+                        }
+                        mx += 2;
+                        if mx > ctx.w as usize -4 {
+                            mx = ctx.w as usize - 4;
+                        }
+                        let h = if args.items.len() > ctx.h as usize - 6 { ctx.h - 6 } else { args.items.len() as u16 + 2};
+                        let w = mx as u16 + 2;
+                        let posx = ctx.w/2 - w/2;
+                        let posy = ctx.h/2 - h/2;
+                        let panel = Box::new(Panel::new(ctx, "p", posx, posy, w, h, Color::Black));
+                        let lbl = Box::new(Label::new(ctx, "lbl", posx+1, posy, Color::White, Color::Black, &args.title)); // TODO: cut title if long
+                        let mut lbx = Box::new(ListBox::new(ctx, "lbx", posx+1, posy+1, w-2, h-2, Color::DarkBlue, Color::Blue));
+                        for (idx, item) in args.items.iter().enumerate() {
+                            lbx.push_item(ListItem::new(item, Command::ID(idx)));
+                        }
+                        lbx.set_selected(selected);
+                        self.next_gen();
+                        self.push(panel);
+                        self.push(lbl);
+                        self.push(lbx);
+                        self.set_focus("lbx", scr)?;
+                    },
+                    _ => info!("unimplemented dialog {:?}", dlg),
+                }
                 Ok(Transition::None)
             },
             _ => Ok(r),

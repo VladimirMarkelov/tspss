@@ -46,6 +46,12 @@ impl ListBox {
     pub fn push_item(&mut self, item: ListItem) {
         self.items.push(item);
     }
+    pub fn set_selected(&mut self, idx: usize) {
+        if idx >= self.items.len() {
+            return;
+        }
+        self.selected = idx;
+    }
 }
 
 impl Widget for ListBox {
@@ -125,8 +131,8 @@ impl Widget for ListBox {
                         Ok(Transition::None)
                     } else {
                         let item = &self.items[self.selected];
-                        if let Some(menu) = item.submenu {
-                            Ok(Transition::Push(menu))
+                        if let Some(menu) = &item.submenu {
+                            Ok(Transition::Push(menu.clone()))
                         } else {
                             Ok(Transition::Pop(Msg::Cmd(item.command)))
                         }

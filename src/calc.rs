@@ -10,14 +10,13 @@ use unicode_width::UnicodeWidthStr;
 use bincode::{serialize_into, deserialize_from};
 
 use crate::primitive::Screen;
-use crate::ui::{Widget,Context,Transition,NOTHING};
+use crate::ui::{Widget,Context,Transition,NOTHING,MAIN_WIDGET,Dialog,PageListArgs};
 use crate::edit::Edit;
 use crate::strs;
 use crate::sheet::{Sheet, CalcMode, VERSION};
 use crate::parse::{Range, idx_to_name, MAX_COLS, MAX_ROWS, DEF_NUM_WIDTH};
 use crate::ops::{err_msg};
 
-const MAIN_WIDGET: &str = "calc";
 const MAX_PAGES: usize = 100; // TODO:
 
 pub struct Calc {
@@ -311,13 +310,14 @@ impl Calc {
                 Transition::None
             },
             CalcMode::Command => {
-                if self.run_command(&self.ed_bottom.text()) {
+                let tr = self.run_command(&self.ed_bottom.text());
+                if let Transition::Exit = tr {
                     return Transition::Exit;
                 }
                 self.ed_bottom.on_deactivate();
                 let sheet = &mut self.sheets[self.sheet];
                 sheet.mode = CalcMode::Move;
-                Transition::None
+                tr
             },
             CalcMode::TempSelect => {
                 let sheet = &mut self.sheets[self.sheet];
@@ -337,6 +337,11 @@ impl Calc {
         }
     }
     fn process_event_inner(&mut self, ctx: &Context, scr: &mut Screen, event: Event) -> Result<Transition> {
+        // TODO: redesign: items are not needed always, but the next 'sheet' takes mutable reference
+        let mut items: Vec<String> = Vec::new();
+        for s in &self.sheets {
+            items.push(s.name.clone());
+        }
         let sheet = &mut self.sheets[self.sheet];
         let ev = match event {
             Event::Key(ev) => {
@@ -389,6 +394,7 @@ impl Calc {
                         Transition::EventPass
                     },
                     KeyCode::Char(c) => match c {
+                        // TODO: check sheet.mode
                         'h' | 'H' => sheet.arrow_left(ev.modifiers),
                         'l' | 'L' => sheet.arrow_right(ev.modifiers),
                         'k' | 'K' => sheet.arrow_up(ev.modifiers),
@@ -423,6 +429,16 @@ impl Calc {
                         } else {
                             Transition::EventPass
                         },
+                        'p' => if ev.modifiers == KeyModifiers::ALT {
+                            let msg = PageListArgs {
+                                title: String::from("Select page"),
+                                default: sheet.name.clone(),
+                                items,
+                            };
+                            Transition::Push(Dialog::PageList(msg))
+                        } else {
+                            Transition::EventPass
+                        },
                         _ => {
                             Transition::EventPass
                         },
@@ -445,7 +461,7 @@ impl Calc {
         self.gen = 0;
     }
     // Returns true if the application must be closes
-    fn run_command(&mut self, cmd: &str) -> bool { // true if app must close // TODO: enum?
+    fn run_command(&mut self, cmd: &str) -> Transition { // true if app must close // TODO: enum?
         let cmd = cmd.trim();
         let (command, args) = match cmd.find(' ') {
             None => (&cmd[..], ""),
@@ -458,7 +474,7 @@ impl Calc {
                 let path = args.trim();
                 if path.is_empty() { // TODO: allow empty if the file was already saved or loaded
                     self.err = Some("empty file path".to_string());
-                    return false;
+                    return Transition::None;
                 }
                 if let Err(e) = self.save(&PathBuf::from(path)) {
                     self.err = Some(format!("failed to save to '{}': {:?}", path, e));
@@ -470,7 +486,7 @@ impl Calc {
                 let path = args.trim();
                 if path.is_empty() { // TODO: allow empty to reload
                     self.err = Some("empty file path".to_string());
-                    return false;
+                    return Transition::None;
                 }
                 if let Err(e) = self.load(&PathBuf::from(path)) {
                     self.err = Some(format!("failed to load from '{}': {:?}", path, e));
@@ -481,12 +497,12 @@ impl Calc {
             "q" | "quit" => {
                 if self.is_dirty() {
                     self.err = Some("There are unsaved changes. Use 'q!' to quit without saving".to_string());
-                    return false;
+                    return Transition::None;
                 }
-                return true;
+                return Transition::Exit;
             },
             "q!" | "quit!" => {
-                return true;
+                return Transition::Exit;
             },
             "fixrow" => {
                 let mut sheet = &mut self.sheets[self.sheet];
@@ -513,7 +529,7 @@ impl Calc {
             "newpage" => {
                 if self.sheets.len() >= MAX_PAGES {
                     self.err = Some("too many pages".to_string());
-                    return false;
+                    return Transition::None;
                 }
                 let mut name = args.trim(); // TODO: validate page name
                 let mut idx = 1;
@@ -535,6 +551,7 @@ impl Calc {
                     }
                 }
                 let mut sheet = Sheet::new(idx, self.w, self.h);
+                sheet.dirty = true;
                 if !name.is_empty() {
                     sheet.name = name.to_string();
                 }
@@ -546,7 +563,7 @@ impl Calc {
                 info!("Invalid command: {}", command);
             },
         }
-        false
+        Transition::None
     }
     fn save(&mut self, path: &Path) -> Result<()> {
         let f = File::create(path)?;
