@@ -5,7 +5,7 @@ use crossterm::event::{Event, KeyCode};
 use unicode_width::UnicodeWidthStr;
 use crossterm::style::{Color};
 
-use crate::primitive::Screen;
+use crate::primitive::{Screen,Border};
 use crate::panel::Panel;
 use crate::listbox::{ListBox, ListItem};
 use crate::label::Label;
@@ -268,7 +268,7 @@ impl WidgetStack {
                         let w = mx as u16 + 2;
                         let posx = ctx.w/2 - w/2;
                         let posy = ctx.h/2 - h/2;
-                        let panel = Box::new(Panel::new(ctx, "p", posx, posy, w, h, Color::Black));
+                        let panel = Box::new(Panel::new(ctx, "p", posx, posy, w, h, Color::White, Color::Black, Border::Single));
                         let lbl = Box::new(Label::new(ctx, "lbl", posx+1, posy, Color::White, Color::Black, &args.title)); // TODO: cut title if long
                         let mut lbx = Box::new(ListBox::new(ctx, "lbx", posx+1, posy+1, w-2, h-2, Color::DarkBlue, Color::Blue));
                         for (idx, item) in args.items.iter().enumerate() {

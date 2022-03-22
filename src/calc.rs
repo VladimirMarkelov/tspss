@@ -193,7 +193,6 @@ impl Calc {
                     let attr = sheet.cell_attr(c, r);
                     let cell = sheet.cell(c, r);
                     scr.colors(attr.fg, attr.bg);
-                    // TODO: align
                     let align = cell.align();
                     let mut title = cell.title();
                     let l = title.width();
@@ -233,7 +232,6 @@ impl Calc {
                     let attr = sheet.cell_attr(c, r);
                     let cell = sheet.cell(c, r);
                     scr.colors(attr.fg, attr.bg);
-                    // TODO: align
                     let align = cell.align();
                     let mut title = cell.title();
                     let l = title.width();
@@ -262,7 +260,6 @@ impl Calc {
                 let attr = sheet.cell_attr(c, r);
                 let cell = sheet.cell(c, r);
                 scr.colors(attr.fg, attr.bg);
-                // TODO: align
                 let align = cell.align();
                 let mut title = cell.title();
                 let l = title.width();

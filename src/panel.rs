@@ -2,7 +2,7 @@ use anyhow::{/* anyhow,  */Result};
 use crossterm::{ style::{ Color} };
 use crossterm::event::{KeyCode, Event};
 
-use crate::primitive::Screen;
+use crate::primitive::{Screen, Border};
 use crate::ui::{Widget,Context,Transition, Msg};
 
 pub struct Panel {
@@ -11,14 +11,17 @@ pub struct Panel {
     row: u16,
     w: u16,
     h: u16,
+    fg: Color,
     bg: Color,
+    border: Border,
     gen: usize,
     visible: bool,
 }
 
 impl Panel {
-    pub fn new(ctx: &Context, name: &str, col: u16, row: u16, w: u16, h: u16, bg: Color) -> Panel {
-        Panel {name: name.to_string(), col, row, w, h, bg, gen: 0, visible: true,}
+    // TODO: too many args
+    pub fn new(ctx: &Context, name: &str, col: u16, row: u16, w: u16, h: u16, fg: Color, bg: Color, border: Border) -> Panel {
+        Panel {name: name.to_string(), col, row, w, h, fg, bg, border, gen: 0, visible: true,}
     }
 }
 
@@ -27,8 +30,9 @@ impl Widget for Panel {
         if !self.visible {
             return Ok(());
         }
-        scr.colors(Color::White, self.bg);
-        scr.fill_rect(self.col, self.row, self.w, self.h, ' ');
+        scr.colors(self.fg, self.bg);
+        scr.draw_frame(self.col, self.row, self.w, self.h, self.border);
+        scr.fill_rect(self.col+1, self.row+1, self.w-2, self.h-2, ' ');
         Ok(())
     }
     fn process_event(&mut self, ctx: &Context, scr: &mut Screen, event: Event) -> Result<Transition> {
