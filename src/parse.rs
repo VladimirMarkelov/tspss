@@ -404,6 +404,7 @@ pub fn parse_func(s: &str) -> (&str, String) {
     (s, String::new())
 }
 
+// TODO: "10:10" is parsed as Float(10.0)
 pub fn parse_arg(s: &str) -> Result<(&str, Arg)> {
     if s.is_empty() {
         return Ok((s, Arg::End));
@@ -822,6 +823,18 @@ mod buf_test {
                 assert_eq!(val, a, "{:?}", test.st);
                 s = skip_white(st);
             }
+        }
+    }
+    #[test]
+    fn range_title() {
+        let tests: Vec<&'static str> = vec![
+            "C:C", "A1:D3", /*"10:10",*/ "$A3:G$7", "$H$6:$I$9",
+        ];
+        for test in tests {
+            let r = parse_arg(test);
+            let (_st, val) = r.unwrap();
+            let back = val.title();
+            assert_eq!(back.as_str(), test, "{:?}", val);
         }
     }
 }

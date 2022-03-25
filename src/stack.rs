@@ -201,11 +201,21 @@ mod buf_test {
         let tests: Vec<Tst> = vec![
             Tst{
                 val: "sum(sin(),cos(1,3))", err: false,
-                res: Vec::new(), // TODO:
+                res: vec![
+                    Arg::Func("sin".to_string(), 0),
+                    Arg::Number(1.0), Arg::Number(3.0), Arg::Func("cos".to_string(), 2),
+                    Arg::Func("sum".to_string(), 2),
+                ],
             },
             Tst{
                 val: "sum(-234+A5,57)*20%-8", err: false,
-                res: Vec::new(), // TODO:
+                res: vec![
+                    Arg::Number(234.0), Arg::Op("----".to_string()),
+                    Arg::Rng(vec![Pos{col:0, row: 4, fixed_row: false, fixed_col: false, full_col: false, full_row: false}]),
+                    Arg::Op("+".to_string()), Arg::Number(57.0), Arg::Func("sum".to_string(), 2),
+                    Arg::Number(20.0), Arg::Op("%".to_string()), Arg::Op("*".to_string()),
+                    Arg::Number(8.0), Arg::Op("-".to_string()),
+                ],
             },
         ];
         for t in tests {

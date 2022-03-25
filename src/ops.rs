@@ -62,10 +62,25 @@ impl Arg {
         match self {
             Arg::End => String::new(),
             Arg::Op(s)| Arg::Eq(s)| Arg::OBracket(s)| Arg::CBracket(s)| Arg::Str(s) => s.to_string(),
-            Arg::Rng(v) => if v.len() == 1 { // TODO: fixed and full
-                format!("{}{}", idx_to_name(v[0].col), v[0].row+1)
+            Arg::Rng(v) => if v.len() == 1 {
+                let col_fixed = if v[0].fixed_col { "$" } else { "" };
+                let row_fixed = if v[0].fixed_row { "$" } else { "" };
+                format!("{}{}{}{}", col_fixed, idx_to_name(v[0].col), row_fixed, v[0].row+1)
             } else if v.len() == 2 {
-                format!("{}{}:{}{}", idx_to_name(v[0].col), v[0].row+1, idx_to_name(v[1].col), v[1].row+1)
+                let col0_fixed = if v[0].fixed_col { "$" } else { "" };
+                let row0_fixed = if v[0].fixed_row { "$" } else { "" };
+                if v[0].full_col {
+                    format!("{}{}:{}{}", col0_fixed, idx_to_name(v[0].col), col0_fixed, idx_to_name(v[0].col))
+                } else if v[0].full_row {
+                    format!("{}{}:{}{}", row0_fixed, v[0].row+1, row0_fixed, v[0].row+1)
+                } else {
+                    let col1_fixed = if v[1].fixed_col { "$" } else { "" };
+                    let row1_fixed = if v[1].fixed_row { "$" } else { "" };
+                    format!("{}{}{}{}:{}{}{}{}",
+                        col0_fixed, idx_to_name(v[0].col), row0_fixed, v[0].row+1,
+                        col1_fixed, idx_to_name(v[1].col), row1_fixed, v[1].row+1
+                    )
+                }
             } else {
                 String::from("#VALUE!")
             },
