@@ -188,7 +188,7 @@ pub fn expr_to_stack(args: &[Arg]) -> Result<Vec<Arg>> {
 
 #[rustfmt::skip]
 #[cfg(test)]
-mod buf_test {
+mod stack_test {
     use super::*;
     use crate::ops::*;
     #[test]

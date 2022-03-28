@@ -252,7 +252,7 @@ impl Screen {
 
 #[rustfmt::skip]
 #[cfg(test)]
-mod buf_test {
+mod primitive_test {
     use super::*;
 
     #[test]

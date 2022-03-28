@@ -90,6 +90,76 @@ impl Arg {
             Arg::Comma => String::from(","),
         }
     }
+    pub fn in_range(&self, col: usize, row: usize) -> bool {
+        match self {
+            Arg::Rng(v) => if v.len() == 1 {
+                v[0].col == col && v[0].row == row
+            } else {
+                v[0].col >= col && v[0].row >= row && v[1].col <= col && v[1].row <= row
+            },
+            _ => false,
+        }
+    }
+    pub fn move_by(&mut self, dcol: isize, drow: isize) {
+        if dcol == 0 && drow == 0 {
+            return;
+        }
+        match self {
+            Arg::Rng(v) => {
+                let mut vnew: Vec<Pos> = Vec::new();
+                let mut changed = false;
+                for mut pos in v.iter().cloned() {
+                    if !pos.fixed_col && dcol != 0 {
+                        let newcol = pos.col as isize + dcol;
+                        pos.col = if newcol < 0 { 0 } else { newcol as usize};
+                        changed = true;
+                    }
+                    if !pos.fixed_row && drow != 0 {
+                        let newrow = pos.row as isize + drow;
+                        pos.row = if newrow < 0 { 0 } else { newrow as usize};
+                        changed = true;
+                    }
+                    vnew.push(pos);
+                }
+                if changed {
+                    std::mem::swap(self, &mut Arg::Rng(vnew));
+                }
+            },
+            _ => {},
+        }
+    }
+    pub fn shift_range(&mut self, base_col: usize, base_row: usize, dcol: isize, drow: isize) {
+        println!("ARG: {:?} / {}x{}", self, base_col, base_row);
+        if dcol == 0 && drow == 0 {
+            return;
+        }
+        match self {
+            Arg::Rng(v) => {
+                let mut vnew: Vec<Pos> = Vec::new();
+                let mut changed = false;
+                for mut pos in v.iter().cloned() {
+                    println!("IN: {:?}", &pos);
+                    if !pos.fixed_col && dcol != 0 && pos.col >= base_col {
+                        let newcol = pos.col as isize + dcol;
+                        pos.col = if newcol < 0 { 0 } else { newcol as usize};
+                        println!("changed col: {:?}", &pos);
+                        changed = true;
+                    }
+                    if !pos.fixed_row && drow != 0 && pos.row >= base_row {
+                        let newrow = pos.row as isize + drow;
+                        pos.row = if newrow < 0 { 0 } else { newrow as usize};
+                        println!("changed row: {:?}", &pos);
+                        changed = true;
+                    }
+                    vnew.push(pos);
+                }
+                if changed {
+                    std::mem::swap(self, &mut Arg::Rng(vnew));
+                }
+            },
+            _ => {},
+        }
+    }
 }
 
 #[derive(Debug,Copy,Clone, PartialEq)]

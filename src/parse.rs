@@ -451,7 +451,7 @@ pub fn parse_arg(s: &str) -> Result<(&str, Arg)> {
 
 #[rustfmt::skip]
 #[cfg(test)]
-mod buf_test {
+mod parse_test {
     use super::*;
     use crate::ops::*;
     #[test]
@@ -828,13 +828,64 @@ mod buf_test {
     #[test]
     fn range_title() {
         let tests: Vec<&'static str> = vec![
-            "C:C", "A1:D3", /*"10:10",*/ "$A3:G$7", "$H$6:$I$9",
+            "C:C", "A1:D3", /*"10:10",*/ "$A3:G$7", "$H$6:$I$9", "GH345:XZU98100",
         ];
         for test in tests {
             let r = parse_arg(test);
             let (_st, val) = r.unwrap();
             let back = val.title();
             assert_eq!(back.as_str(), test, "{:?}", val);
+        }
+    }
+    #[test]
+    fn range_move() {
+        struct Tst {
+            base: &'static str,
+            res: &'static str,
+            dcol: isize,
+            drow: isize,
+        }
+        let tests: Vec<Tst> = vec![
+            Tst{ base: "A2:$B4", dcol: 2, drow: 3, res: "C5:$B7" },
+            Tst{ base: "B$2:Z45", dcol: 3, drow: 2, res: "E$2:AC47" },
+            Tst{ base: "C:C", dcol: 2, drow: 3, res: "E:E" },
+            Tst{ base: "C:C", dcol: -1, drow: -2, res: "B:B" },
+            Tst{ base: "BBB1000", dcol: 2, drow: 3, res: "BBD1003" },
+            Tst{ base: "A2:$B4", dcol: -2, drow: -3, res: "A1:$B1" },
+        ];
+        for test in tests {
+            let r = parse_arg(test.base);
+            let (_st, mut val) = r.unwrap();
+            val.move_by(test.dcol, test.drow);
+            let title = val.title();
+            assert_eq!(title.as_str(), test.res, "{:?}", val);
+        }
+    }
+    #[test]
+    fn range_shift() {
+        struct Tst {
+            st: &'static str,
+            res: &'static str,
+            dcol: isize,
+            drow: isize,
+            brow: usize,
+            bcol: usize,
+        }
+        let tests: Vec<Tst> = vec![
+            Tst{ st: "A2:E9", bcol: 10, brow: 10, dcol: 2, drow: 3, res: "A2:E9" },
+            Tst{ st: "A2:$E9", bcol: 4, brow: 5, dcol: 0, drow: 0, res: "A2:$E9" },
+            Tst{ st: "A2:$E9", bcol: 4, brow: 5, dcol: 2, drow: 0, res: "A2:$E9" },
+            Tst{ st: "A2:E9", bcol: 4, brow: 5, dcol: 0, drow: 0, res: "A2:E9" },
+            Tst{ st: "A2:E9", bcol: 4, brow: 5, dcol: 2, drow: 2, res: "A2:G11" },
+            Tst{ st: "A2:E9", bcol: 4, brow: 5, dcol: -2, drow: -2, res: "A2:C7" },
+            Tst{ st: "F12:I19", bcol: 4, brow: 5, dcol: 2, drow: 1, res: "H13:K20" },
+        ];
+        for test in tests {
+            let r = parse_arg(test.st);
+            let (_st, mut val) = r.unwrap();
+            val.shift_range(test.bcol, test.brow, test.dcol, test.drow);
+            let title = val.title();
+            assert_eq!(title.as_str(), test.res, "{:?}", val);
         }
     }
 }
