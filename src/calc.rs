@@ -325,11 +325,9 @@ impl Calc {
         let mode = self.sheets[self.sheet].mode;
         match mode {
             CalcMode::Move => {
-                // self.mark_current_cell();
                 let sheet = &mut self.sheets[self.sheet];
                 let (col, row) = (sheet.cursor.col, sheet.cursor.row);
                 info!("--> edit marking {}x{}", col, row);
-                sheet.mark_cell(col, row);
                 let cell = sheet.cell(col, row);
                 sheet.mode = CalcMode::Edit;
                 self.ed_top.set_text(&cell.val);
@@ -547,25 +545,25 @@ impl Calc {
                 return Transition::Exit;
             },
             "fixrow" => {
-                let mut sheet = &mut self.sheets[self.sheet];
+                let sheet = &mut self.sheets[self.sheet];
                 let row = sheet.cursor.row;
                 if let Err(e) = sheet.fix_row(row + 1) {
                     self.err = Some(e.to_string());
                 }
             },
             "fixcol" => {
-                let mut sheet = &mut self.sheets[self.sheet];
+                let sheet = &mut self.sheets[self.sheet];
                 let col = sheet.cursor.col;
                 if let Err(e) = sheet.fix_col(col + 1) {
                     self.err = Some(e.to_string());
                 }
             },
             "nofixrow" => {
-                let mut sheet = &mut self.sheets[self.sheet];
+                let sheet = &mut self.sheets[self.sheet];
                 sheet.unfix_row();
             },
             "nofixcol" => {
-                let mut sheet = &mut self.sheets[self.sheet];
+                let sheet = &mut self.sheets[self.sheet];
                 sheet.unfix_col();
             },
             "newpage" => {
@@ -577,7 +575,7 @@ impl Calc {
                     self.err = Some("too many pages".to_string());
                     return Transition::None;
                 }
-                let mut name = args.trim(); // TODO: validate page name
+                let name = args.trim(); // TODO: validate page name
                 let mut idx = 1;
                 if name.is_empty() {
                     // TODO: optimize

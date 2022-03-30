@@ -2,13 +2,13 @@ use std::collections::HashMap;
 
 use anyhow::{anyhow, Result};
 
-use crate::ops::{Arg, NEG_SIGN, POS_SIGN, cr_to_uid};
+use crate::ops::{Arg, NEG_SIGN, POS_SIGN, pos_to_id};
 use crate::sheet::{Sheet};
 use crate::stack::{str_expr_to_vec, expr_to_stack};
 
 pub struct Expr {
     stk: Vec<Arg>,
-    pub cache: HashMap<usize, u8>,
+    pub cache: HashMap<u64, u8>,
 }
 
 impl Default for Expr {
@@ -53,7 +53,7 @@ impl Expr {
                 if !cell.is_expr() {
                     return Ok(cell.calculated.clone());
                 }
-                let uid = cr_to_uid(v[0].col, v[0].row);
+                let uid = pos_to_id(v[0].col, v[0].row);
                 let state = match self.cache.get(&uid) {
                     None => 0,
                     Some(v) => *v,
@@ -65,8 +65,7 @@ impl Expr {
                     let args = str_expr_to_vec(&cell.val[1..])?;
                     let args = expr_to_stack(&args)?;
                     let res = self.calculate(&args, sheet);
-                    let (c, r) = sheet.cell_indices(v[0].col, v[0].row);
-                    sheet.set_cell_calc_value(c, r, res);
+                    sheet.set_cell_calc_value(v[0].col, v[0].row, res);
                     self.cache.insert(uid, 2);
                     cell = sheet.cell(v[0].col, v[0].row);
                 }

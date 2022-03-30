@@ -2,6 +2,7 @@ use std::char;
 use std::io::{Write,Read};
 use std::fs::File;
 use std::collections::HashMap;
+use std::collections::BTreeMap;
 
 use anyhow::{anyhow, Result};
 use crossterm::{ style::{ Color} };
@@ -14,7 +15,7 @@ use crate::ui::{Widget,Context,Transition,NOTHING};
 use crate::edit::Edit;
 use crate::strs;
 use crate::parse::{idx_to_name, MAX_COLS, MAX_ROWS, DEF_NUM_WIDTH, Range, parse_float};
-use crate::ops::{Arg,Pos, err_msg, cr_to_uid};
+use crate::ops::{Arg,Pos, err_msg, pos_to_id, id_to_pos};
 use crate::stack::{str_expr_to_vec, expr_to_stack};
 use crate::expr::{Expr};
 
@@ -281,9 +282,6 @@ impl Cell {
 
 pub struct Sheet {
     pub name: String,
-    pub rows: Vec<usize>, // this and next for sparse tables, items in vecs are cols and rows that
-    pub cols: Vec<usize>, // have something
-    // used: Vec<Pos>, // cells that are used in any formula to quick check for recalc after edit
     pub first_row: usize, // top row in the screen
     pub first_col: usize, // most-left column in the screen
     pub cursor: Pos,
@@ -296,11 +294,14 @@ pub struct Sheet {
     // col_attrs: Vec<OptionAttr>, // column default attrs // see TODO: below
     // row_attrs: Vec<OptionAttr>, // row default attrs // TODO: when setting a new default, replace
     //                        // cell attrs with row ones for existing row/cols
-    pub cells: Vec<Vec<Cell>>, // cells by rows<cols>
     pub mode: CalcMode,
     pub dirty: bool,
     pub h: u16, // height and width of sheet cell area
     pub w: u16,
+
+    pub cells: BTreeMap<u64, Cell>,
+    pub max_row: usize, // maximum used column number
+    pub max_col: usize, // maximum used row number
 }
 
 impl Sheet {
@@ -310,9 +311,6 @@ impl Sheet {
             first_col: 0,
             first_row: 0,
             cursor: Pos::new(0, 0),
-            rows: Vec::new(),
-            cols: Vec::new(),
-            cells: Vec::new(),
             select_start: None,
             select_end: None,
             select_type: SelectType::V,
@@ -322,6 +320,9 @@ impl Sheet {
             fixed_rows: 0,
             dirty: false,
             w, h,
+            cells: BTreeMap::new(),
+            max_row: 0,
+            max_col: 0,
         }
     }
     pub fn col_width(&self, col: usize) -> u16 {
@@ -434,26 +435,11 @@ impl Sheet {
         }
         self.first_row = row - self.fixed_rows;
     }
-    pub fn cell_indices(&self, col: usize, row: usize) -> (usize, usize) {
-        let rowpos = self.rows.binary_search(&row);
-        let colpos = self.cols.binary_search(&col);
-        match (colpos, rowpos) {
-            (Err(e), _) => panic!("col is not marked: {:?}", e),
-            (_, Err(e)) => panic!("row is not marked: {:?}", e),
-            (Ok(c), Ok(r)) => {
-                (c, r)
-            }
-        }
-    }
     pub fn cell(&self, col: usize, row: usize) -> Cell {
-        let rowpos = self.rows.binary_search(&row);
-        let colpos = self.cols.binary_search(&col);
-        match (colpos, rowpos) {
-            (Err(_), _) => Default::default(),
-            (_, Err(_)) => Default::default(),
-            (Ok(c), Ok(r)) => {
-                self.cells[r][c].clone()
-            }
+        let id = pos_to_id(col, row);
+        match self.cells.get(&id) {
+            None => Default::default(),
+            Some(v) => v.clone(),
         }
     }
     fn parse_value(&self, text: &str) -> Arg {
@@ -475,30 +461,28 @@ impl Sheet {
             }
         }
     }
-    fn calc_expr(&mut self, expr: &str, uid: usize) -> Result<Arg> {
+    fn calc_expr(&mut self, expr: &str, uid: u64) -> Result<Arg> {
         let args = str_expr_to_vec(expr)?;
         let args = expr_to_stack(&args)?;
         let mut expr = Expr::default(); // TODO: must be a member of Sheet
         expr.cache.insert(uid, 1);
         expr.calculate(&args, self)
     }
-    pub fn set_cell_calc_value(&mut self, c: usize, r: usize, val: Result<Arg>) {
-        if let Some(rr) = self.cells.get_mut(r) {
-            if let Some(cell) = rr.get_mut(c) {
-                match val {
-                    Err(e) => {
-                        info!("{:?}", e);
-                        cell.err = 1;
-                        cell.calculated = Arg::End;
-                    },
-                    Ok(v) => {
-                        cell.calculated = v;
-                    },
-                }
+    pub fn set_cell_calc_value(&mut self, col: usize, row: usize, val: Result<Arg>) {
+        let id = pos_to_id(col, row);
+        if let Some(cell) = self.cells.get_mut(&id) {
+            match val {
+                Ok(v) => cell.calculated = v,
+                Err(e) => {
+                    info!("{:?}", e);
+                    cell.err = 1;
+                    cell.calculated = Arg::End;
+                },
             }
         }
     }
     pub fn set_cell_text(&mut self, col: usize, row: usize, text: &str) {
+        let id = pos_to_id(col, row);
         let text = text.trim();
         {
             let cell = self.cell(col, row);
@@ -506,51 +490,67 @@ impl Sheet {
                 return;
             }
         }
-        self.mark_cell(col, row);
-        let (c, r) = self.cell_indices(col, row);
         let mut do_calc = false;
-        if let Some(rr) = self.cells.get_mut(r) {
-            if let Some(cell) = rr.get_mut(c) {
-                cell.val = text.to_string();
-                do_calc = text.starts_with('=');
-                cell.err = 0;
-            }
+        do_calc = text.starts_with('=');
+        if let Some(cell) = self.cells.get_mut(&id) {
+            cell.val = text.to_string();
+            cell.err = 0;
+        } else {
+            let mut cell = Cell::default();
+            cell.val = text.to_string();
+            self.cells.insert(id, cell);
         }
         if !do_calc {
             let v = self.parse_value(text);
-            self.set_cell_calc_value(c, r, Ok(v));
+            self.set_cell_calc_value(col, row, Ok(v));
             self.recalc_cells();
             self.dirty = true;
             return;
         }
         info!("calculate {}", text);
-        let val = self.calc_expr(&text[1..], cr_to_uid(col, row));
-        self.set_cell_calc_value(c, r, val);
+        let val = self.calc_expr(&text[1..], id);
+        self.set_cell_calc_value(col, row, val);
         self.recalc_cells();
         self.dirty = true;
     }
     pub fn set_cell_attr(&mut self, col: usize, row: usize, attr: OptionAttr) {
-        self.mark_cell(col, row);
-        let (c, r) = self.cell_indices(col, row);
+        let id = pos_to_id(col, row);
         self.dirty = true;
-        if let Some(rr) = self.cells.get_mut(r) {
-            if let Some(cell) = rr.get_mut(c) {
-                if let Some(fg) = attr.fg {
-                    cell.attr.fg = attr.fg;
-                }
-                if let Some(bg) = attr.bg {
-                    cell.attr.bg = attr.bg;
-                }
-                if let Some(align) = attr.align {
-                    cell.attr.align = attr.align;
-                }
+        if let Some(cell) = self.cells.get_mut(&id) {
+            if attr.fg.is_some() {
+                cell.attr.fg = attr.fg;
             }
+            if attr.bg.is_some() {
+                cell.attr.bg = attr.bg;
+            }
+            if attr.align.is_some() {
+                cell.attr.align = attr.align;
+            }
+            return;
         }
+
+        let mut cell = Cell::default();
+        if attr.fg.is_some() {
+            cell.attr.fg = attr.fg;
+        }
+        if attr.bg.is_some() {
+            cell.attr.bg = attr.bg;
+        }
+        if attr.align.is_some() {
+            cell.attr.align = attr.align;
+        }
+        self.set_cell(col, row, cell);
     }
     fn set_cell(&mut self, col: usize, row: usize, cell: Cell) {
-        self.mark_cell(col, row);
-        let (c, r) = self.cell_indices(col, row);
-        self.cells[r][c] = cell;
+        if col > self.max_col {
+            self.max_col = col;
+        }
+        if row > self.max_row {
+            self.max_row = row;
+        }
+        let id = pos_to_id(col, row);
+        info!("insert cell at {}x{} = {}", col, row, id);
+        self.cells.insert(id, cell);
         self.dirty = true;
     }
     pub fn is_under_cursor(&self, col: usize, row: usize) -> bool {
@@ -666,7 +666,6 @@ impl Sheet {
         self.ensure_visible_row();
     }
     pub fn arrow_left(&mut self, md: KeyModifiers) -> Transition {
-        let w = self.w;
         match md {
             KeyModifiers::NONE => {
                 if self.select_start.is_some() && self.select_end.is_none() && !self.is_select_v() {
@@ -694,7 +693,6 @@ impl Sheet {
         }
     }
     pub fn arrow_right(&mut self, md: KeyModifiers)-> Transition  {
-        let w = self.w;
         match md {
             KeyModifiers::NONE => {
                 if self.select_start.is_some() && self.select_end.is_none() && !self.is_select_v() {
@@ -722,7 +720,6 @@ impl Sheet {
         }
     }
     pub fn arrow_down(&mut self, md: KeyModifiers)-> Transition  {
-        let h = self.h;
         match md {
             KeyModifiers::NONE => {
                 if self.select_start.is_some() && self.select_end.is_none() && !self.is_select_v() {
@@ -750,7 +747,6 @@ impl Sheet {
         }
     }
     pub fn arrow_up(&mut self, md: KeyModifiers)-> Transition  {
-        let h = self.h;
         match md {
             KeyModifiers::NONE => {
                 if self.select_start.is_some() && self.select_end.is_none() && !self.is_select_v() {
@@ -798,10 +794,8 @@ impl Sheet {
     pub fn go_end(&mut self, md: KeyModifiers)-> Transition  {
         match md {
             KeyModifiers::NONE => {
-                if let Some(c) = self.cols.last() {
-                    self.cursor.col = *c;
-                    self.ensure_visible_col();
-                }
+                self.cursor.col = self.max_col;
+                self.ensure_visible_col();
                 Transition::None
             },
             _ => Transition::EventPass,
@@ -856,28 +850,6 @@ impl Sheet {
             Range::Row(_) => {}, // TODO:
         }
         self.cancel_select();
-    }
-
-    // Mark col and row used. If any was not used before, move all the data in cell array.
-    pub fn mark_cell(&mut self, col: usize, row: usize) {
-        info!("1. {} x {}", col, row);
-        // TODO: move cells, widths, etc
-        let rowpos = self.rows.binary_search(&row);
-        if let Err(idx) = rowpos {
-            self.rows.insert(idx, row);
-            let cnt = self.cols.len();
-            let v: Vec<Cell> = vec![Cell::default(); cnt];
-            self.cells.insert(idx, v);
-        }
-
-        let colpos = self.cols.binary_search(&col);
-        if let Err(idx) = colpos {
-            self.cols.insert(idx, col);
-            for rr in self.cells.iter_mut() {
-                rr.insert(idx, Default::default());
-            }
-        }
-        info!("2. {:?} x {:?}", self.cols, self.rows);
     }
 
     pub fn is_in_select_mode(&self) -> bool {
@@ -943,18 +915,11 @@ impl Sheet {
         serialize_into(f, &0usize)?; // TODO:
 
         // cells
-        for (idx_r, row) in self.rows.iter().enumerate() {
-            for (idx_c, col) in self.cols.iter().enumerate() {
-                let c = &self.cells[idx_r][idx_c];
-                if c.is_default() {
-                    continue;
-                }
-                let col: usize = self.cols[idx_c];
-                let row: usize = self.rows[idx_r];
-                serialize_into(f, &col)?;
-                serialize_into(f, &row)?;
-                c.save(f)?;
-            }
+        for (id, cell) in self.cells.iter() {
+            let (col, row) = id_to_pos(*id);
+            serialize_into(f, &col)?;
+            serialize_into(f, &row)?;
+            cell.save(f)?;
         }
         // Mark the end of the sheet
         serialize_into(f, &END_OF_CELLS)?; // TODO:
@@ -991,6 +956,8 @@ impl Sheet {
         let _ranges: usize = deserialize_from(f)?; // TODO:
 
         // cells
+        sheet.max_col = 0;
+        sheet.max_row = 0;
         loop {
             let col: usize = deserialize_from(f)?;
             let row: usize = deserialize_from(f)?;
@@ -1008,6 +975,12 @@ impl Sheet {
             let vv = cell.val.clone();
             sheet.set_cell(col, row, cell);
             sheet.set_cell_text(col, row, &vv);
+            if col > sheet.max_col {
+                sheet.max_col = col;
+            }
+            if row > sheet.max_row {
+                sheet.max_row = row;
+            }
         }
         sheet.recalc_cells();
 
@@ -1015,19 +988,17 @@ impl Sheet {
     }
     // TODO: optimize
     fn recalc_cells(&mut self) {
-        let mut hm: HashMap<(usize, usize, usize), String> = HashMap::new();
-        for (idx_r, row) in self.rows.iter().enumerate() {
-            for (idx_c, col) in self.cols.iter().enumerate() {
-                let c = &self.cells[idx_r][idx_c];
-                if !c.is_expr() {
-                    continue;
-                }
-                hm.insert((idx_c, idx_r, cr_to_uid(*col, *row)), c.val[1..].to_string());
+        let mut hm: HashMap<(usize, usize, u64), String> = HashMap::new();
+        for (id, cell) in self.cells.iter() {
+            if !cell.is_expr() {
+                continue;
             }
+            let (col, row) = id_to_pos(*id);
+            hm.insert((col, row, *id), cell.val[1..].to_string());
         }
-        for ((c, r, uid), expr) in hm.drain() {
+        for ((col, row, uid), expr) in hm.drain() {
             let val = self.calc_expr(&expr, uid);
-            self.set_cell_calc_value(c, r, val);
+            self.set_cell_calc_value(col, row, val);
         }
     }
     pub fn resize_col(&mut self, col: usize, delta: i16) {
@@ -1041,19 +1012,17 @@ impl Sheet {
     }
     pub fn autosize_col(&mut self, col: usize) {
         let mut mx: u16 = 0;
-        let colpos = match self.cols.binary_search(&col) {
-            Err(e) => return, // TODO: minimize empty column?
-            Ok(p) => p,
-        };
-        for (idx_r, row) in self.rows.iter().enumerate() {
-            let c = &self.cells[idx_r][colpos];
-            let w = c.title().width() as u16;
-            if w > mx {
-                mx = w;
-            }
-            if mx > MAX_COL_WIDTH {
-                mx = MAX_COL_WIDTH;
-                break;
+        for row in 0..=self.max_row {
+            let id = pos_to_id(col, row);
+            if let Some(cell) = self.cells.get(&id) {
+                let w = cell.title().width() as u16;
+                if w > mx {
+                    mx = w;
+                }
+                if mx > MAX_COL_WIDTH {
+                    mx = MAX_COL_WIDTH;
+                    break;
+                }
             }
         }
         if mx < MIN_COL_WIDTH {
