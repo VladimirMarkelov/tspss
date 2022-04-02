@@ -344,9 +344,10 @@ impl Calc {
                 Transition::None
             },
             CalcMode::Select => {
-                let sheet = &mut self.sheets[self.sheet];
-                sheet.mode = CalcMode::Move;
-                sheet.finish_select();
+                // TODO: do something?
+                // let sheet = &mut self.sheets[self.sheet];
+                // sheet.mode = CalcMode::Move;
+                // sheet.finish_select();
                 Transition::None
             },
             CalcMode::Command => {
@@ -364,6 +365,7 @@ impl Calc {
                 sheet.mode = CalcMode::Edit;
                 let rng = format!("{}", sheet.selected_range());
                 self.ed_top.insert(&rng);
+                sheet.clear_range();
                 Transition::None
             },
             CalcMode::TempSelectStart => {
@@ -419,16 +421,19 @@ impl Calc {
                     KeyCode::Enter => self.process_enter(scr, ev.modifiers),
                     // Delete // TODO: clean a cell or all selected
                     KeyCode::F(2) => if let CalcMode::Move = sheet.mode {
+                        sheet.cancel_select();
                         if ev.modifiers == KeyModifiers::NONE {
                             self.process_enter(scr, ev.modifiers)
                         } else {
                             Transition::EventPass
                         }
                     } else {
+                        sheet.cancel_select();
                         Transition::EventPass
                     },
                     KeyCode::Delete => if ev.modifiers == KeyModifiers::NONE {
                         sheet.clear_range();
+                        sheet.cancel_select();
                         Transition::None
                     } else {
                         Transition::EventPass
@@ -470,6 +475,7 @@ impl Calc {
                             Transition::EventPass
                         },
                         'p' => if ev.modifiers == KeyModifiers::ALT {
+                            sheet.cancel_select();
                             let msg = PageListArgs {
                                 title: String::from("Select page"),
                                 default: sheet.name.clone(),
@@ -477,9 +483,12 @@ impl Calc {
                             };
                             Transition::Push(Dialog::PageList(msg))
                         } else {
+                            sheet.cancel_select();
                             Transition::EventPass
                         },
+                        // 0..9 => save selected range in a register
                         _ => {
+                            sheet.cancel_select();
                             Transition::EventPass
                         },
                     },
