@@ -14,7 +14,7 @@ use crate::primitive::Screen;
 use crate::ui::{Widget,Context,Transition,NOTHING};
 use crate::edit::Edit;
 use crate::strs;
-use crate::parse::{idx_to_name, MAX_COLS, MAX_ROWS, DEF_NUM_WIDTH, Range, parse_float};
+use crate::parse::{idx_to_name, MAX_COLS, MAX_ROWS, DEF_NUM_WIDTH, Range, parse_float, parse_while, parse_arg,is_white};
 use crate::ops::{Arg,Pos, err_msg, pos_to_id, id_to_pos};
 use crate::stack::{str_expr_to_vec, expr_to_stack};
 use crate::expr::{Expr};
@@ -51,7 +51,7 @@ pub struct Attr {
     //format: ...,
     //readonly: ... ?
 }
-#[derive(Clone)]
+#[derive(Clone,Debug)]
 pub struct OptionAttr {
     pub fg: Option<Color>,
     pub bg: Option<Color>,
@@ -215,7 +215,7 @@ fn load_align<R:Read+Copy>(f: R) -> Result<Option<Align>> {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone,Debug)]
 pub struct Cell {
     pub val: String, // user input
     pub calculated: Arg, // calculated user input
@@ -280,6 +280,11 @@ impl Cell {
     }
 }
 
+struct SubRange {
+    rng: Range,
+    values: BTreeMap<u64, Cell>,
+}
+
 pub struct Sheet {
     pub name: String,
     pub first_row: usize, // top row in the screen
@@ -298,10 +303,10 @@ pub struct Sheet {
     pub dirty: bool,
     pub h: u16, // height and width of sheet cell area
     pub w: u16,
-
     pub cells: BTreeMap<u64, Cell>,
     pub max_row: usize, // maximum used column number
     pub max_col: usize, // maximum used row number
+    yanked: Option<SubRange>,
 }
 
 impl Sheet {
@@ -323,6 +328,7 @@ impl Sheet {
             cells: BTreeMap::new(),
             max_row: 0,
             max_col: 0,
+            yanked: None,
         }
     }
     pub fn col_width(&self, col: usize) -> u16 {
@@ -1082,13 +1088,83 @@ impl Sheet {
     pub fn is_row_fixed(&self) -> bool {
         self.fixed_rows != 0 && ((self.fixed_row_height() as u16) < self.h-1)
     }
+    pub fn yank(&mut self) {
+        let rng = self.selected_range();
+        let (col_start, row_start, col_end, row_end) = rng.indices();
+        info!("YANK: {}x{} -  {}x{}", col_start, row_start, col_end, row_end);
+        let mut values: BTreeMap<u64, Cell> = BTreeMap::new();
+        for row in row_start..=row_end {
+            for col in col_start..=col_end {
+                let id = pos_to_id(col, row);
+                if let Some(cell) = self.cells.get(&id) {
+                    values.insert(id, cell.clone());
+                }
+            }
+        }
+        self.yanked = Some(SubRange{rng, values});
+    }
+    pub fn paste_yanked(&mut self) {
+        match &self.yanked {
+            None => return,
+            Some(sub) => {
+                let (col_start, row_start, col_end, row_end) = sub.rng.indices();
+                if col_start == self.cursor.col && row_start == self.cursor.row {
+                    return;
+                }
+                info!("PASTE: {}x{} -  {}x{}", col_start, row_start, col_end, row_end);
+                let dcol = self.cursor.col as isize - col_start as isize;
+                let drow = self.cursor.row as isize - row_start as isize;
+                for row in row_start..=row_end {
+                    for col in col_start..=col_end {
+                        let id = pos_to_id(col, row);
+                        let new_id = pos_to_id(col-col_start+self.cursor.col, row-row_start+self.cursor.row);
+                        if let Some(cell) = sub.values.get(&id) {
+                            let mut clone = cell.clone();
+                            if !clone.is_expr() {
+                                self.cells.insert(new_id, clone);
+                            } else {
+                                let expr = self.move_expression(&cell.val, dcol, drow);
+                                info!("updated expr {} : {}", expr, cell.val);
+                                clone.val = expr;
+                                clone.calculated = Arg::End;
+                                self.cells.insert(new_id, clone);
+                            }
+                        } else {
+                            self.cells.remove(&new_id);
+                        }
+                    }
+                }
+                self.recalc_cells();
+                self.dirty = true;
+            }
+        }
+    }
+    fn move_expression(&self, expr: &str, dcol: isize, drow: isize) -> String {
+        let mut ex: &str = &expr["=".len()..];
+        let mut output: String = String::from("=");
+        loop {
+            if ex.is_empty() {
+                break;
+            }
+            let (st, spaces) = parse_while(ex, |c| is_white(c));
+            if !spaces.is_empty() {
+                output += &spaces;
+            }
+            match parse_arg(st) {
+                Err(e) => return expr.to_string(),
+                Ok((s, mut a)) => {
+                    ex = s;
+                    if let Arg::End = a {
+                        break;
+                    }
+                    a.move_by(dcol, drow);
+                    output += &a.to_expr();
+                },
+            }
+        }
+        output
+    }
     /*
-    fn filter() {
-    }
-    fn hide_rows() {
-    }
-    fn hide_cols() {
-    }
     fn undo() {
     }
     fn redo() {
@@ -1096,8 +1172,6 @@ impl Sheet {
     fn copy() {
     }
     fn paste() {
-    }
-    fn fix_formula() { // after copy-paste
     }
     */
 }

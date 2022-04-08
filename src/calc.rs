@@ -482,11 +482,20 @@ impl Calc {
                                 items,
                             };
                             Transition::Push(Dialog::PageList(msg))
+                        } else if ev.modifiers == KeyModifiers::NONE {
+                            sheet.paste_yanked();
+                            Transition::None
                         } else {
                             sheet.cancel_select();
                             Transition::EventPass
                         },
-                        // 0..9 => save selected range in a register
+                        'y' if ev.modifiers == KeyModifiers::NONE => {
+                            // TODO: display info that something was yanked
+                            sheet.yank();
+                            sheet.cancel_select();
+                            Transition::None
+                        },
+                        // TODO: 0..9 => save selected range in a register
                         _ => {
                             sheet.cancel_select();
                             Transition::EventPass

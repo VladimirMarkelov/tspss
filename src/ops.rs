@@ -90,6 +90,13 @@ impl Arg {
             Arg::Comma => String::from(","),
         }
     }
+    // Like `title` but returns parsable string
+    pub fn to_expr(&self) -> String {
+        match self {
+            Arg::Str(s) => format!("\"{}\"", s.replace("\"", "\"\"\"")),
+            _ => self.title(),
+        }
+    }
     pub fn in_range(&self, col: usize, row: usize) -> bool {
         match self {
             Arg::Rng(v) => if v.len() == 1 {

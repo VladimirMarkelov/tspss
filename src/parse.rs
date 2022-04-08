@@ -34,6 +34,20 @@ impl fmt::Display for Range {
     }
 }
 
+impl Range {
+    pub fn indices(&self) -> (usize, usize, usize, usize) {
+        match self {
+            Range::Single(c) => {
+                (c.col, c.row, c.col, c.row)
+            },
+            Range::Multi(c1, c2) => {
+                (c1.col, c1.row, c2.col, c2.row)
+            },
+            _ => unimplemented!(),
+        }
+    }
+}
+
 fn inc_char(inc: usize) -> char {
     char::from_u32(('A' as usize + inc) as u32).unwrap_or('?')
 }
@@ -86,7 +100,7 @@ pub fn name_to_idx(name: &str) -> Result<usize> {
 
 // ---------------------------------
 
-fn is_white(c: char) -> bool {
+pub fn is_white(c: char) -> bool {
     // c == ' ' || c == '\t' || c == '\n' || c == '\r'
     c.is_ascii_whitespace()
 }
