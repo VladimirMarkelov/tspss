@@ -340,7 +340,7 @@ impl Calc {
                 self.ed_top.on_deactivate();
                 let (col, row) = (sheet.cursor.col, sheet.cursor.row);
                 info!("--> save text {} to {}x{}", self.ed_top.text(), col, row);
-                sheet.set_cell_text(col, row, &self.ed_top.text());
+                sheet.set_cell_text(col, row, &self.ed_top.text(), true);
                 Transition::None
             },
             CalcMode::Select => {
@@ -491,7 +491,13 @@ impl Calc {
                         },
                         'y' if ev.modifiers == KeyModifiers::NONE => {
                             // TODO: display info that something was yanked
-                            sheet.yank();
+                            sheet.yank(false);
+                            sheet.cancel_select();
+                            Transition::None
+                        },
+                        'x' if ev.modifiers == KeyModifiers::NONE => {
+                            // TODO: display info that something was yanked
+                            sheet.yank(true);
                             sheet.cancel_select();
                             Transition::None
                         },

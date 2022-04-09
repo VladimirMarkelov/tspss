@@ -487,7 +487,7 @@ impl Sheet {
             }
         }
     }
-    pub fn set_cell_text(&mut self, col: usize, row: usize, text: &str) {
+    pub fn set_cell_text(&mut self, col: usize, row: usize, text: &str, recalc: bool) {
         let id = pos_to_id(col, row);
         let text = text.trim();
         {
@@ -497,7 +497,7 @@ impl Sheet {
             }
         }
         let mut do_calc = false;
-        do_calc = text.starts_with('=');
+        do_calc = text.starts_with('=') && recalc;
         if let Some(cell) = self.cells.get_mut(&id) {
             cell.val = text.to_string();
             cell.err = 0;
@@ -844,13 +844,14 @@ impl Sheet {
 
     pub fn clear_range(&mut self) {
         match self.selected_range() {
-            Range::Single(pos) => self.set_cell_text(pos.col, pos.row, ""),
+            Range::Single(pos) => self.set_cell_text(pos.col, pos.row, "", true),
             Range::Multi(p1, p2) => {
                 for r in p1.row..=p2.row {
                     for c in p1.col..=p2.col {
-                        self.set_cell_text(c, r, "");
+                        self.set_cell_text(c, r, "", false);
                     }
                 }
+                self.recalc_cells();
             }
             Range::Col(_) => {}, // TODO:
             Range::Row(_) => {}, // TODO:
@@ -980,7 +981,7 @@ impl Sheet {
             let cell = Cell::load(f, version)?;
             let vv = cell.val.clone();
             sheet.set_cell(col, row, cell);
-            sheet.set_cell_text(col, row, &vv);
+            sheet.set_cell_text(col, row, &vv, false);
             if col > sheet.max_col {
                 sheet.max_col = col;
             }
@@ -1088,7 +1089,7 @@ impl Sheet {
     pub fn is_row_fixed(&self) -> bool {
         self.fixed_rows != 0 && ((self.fixed_row_height() as u16) < self.h-1)
     }
-    pub fn yank(&mut self) {
+    pub fn yank(&mut self, cut: bool) {
         let rng = self.selected_range();
         let (col_start, row_start, col_end, row_end) = rng.indices();
         info!("YANK: {}x{} -  {}x{}", col_start, row_start, col_end, row_end);
@@ -1098,8 +1099,14 @@ impl Sheet {
                 let id = pos_to_id(col, row);
                 if let Some(cell) = self.cells.get(&id) {
                     values.insert(id, cell.clone());
+                    if cut {
+                        self.set_cell_text(col, row, "", false);
+                    }
                 }
             }
+        }
+        if cut {
+            self.recalc_cells();
         }
         self.yanked = Some(SubRange{rng, values});
     }
