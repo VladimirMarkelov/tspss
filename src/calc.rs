@@ -13,7 +13,7 @@ use crate::primitive::Screen;
 use crate::ui::{Widget,Context,Transition,NOTHING,MAIN_WIDGET,Dialog,PageListArgs,Msg,Command};
 use crate::edit::Edit;
 use crate::strs;
-use crate::sheet::{Sheet, CalcMode, VERSION, Align};
+use crate::sheet::{Sheet, CalcMode, VERSION, Align, SelectType};
 use crate::parse::{Range, idx_to_name, MAX_COLS, MAX_ROWS, DEF_NUM_WIDTH};
 use crate::ops::{err_msg};
 
@@ -499,6 +499,10 @@ impl Calc {
                             // TODO: display info that something was yanked
                             sheet.yank(true);
                             sheet.cancel_select();
+                            Transition::None
+                        },
+                        'v' if ev.modifiers == KeyModifiers::NONE => {
+                            sheet.start_select(SelectType::V);
                             Transition::None
                         },
                         // TODO: 0..9 => save selected range in a register

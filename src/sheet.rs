@@ -687,14 +687,6 @@ impl Sheet {
                 self.move_left(MoveBy::Cell(1));
                 Transition::None // TODO: selection change
             },
-            /*
-            (KeyModifiers::SHIFT|KeyModifiers::CONTROL)=>  {
-                Transition::None // TODO: selection change by page
-            },
-            KeyModifiers::CONTROL => {
-                Transition::None // TODO: move by page
-            },
-            */
             _ => Transition::EventPass,
         }
     }
@@ -714,14 +706,6 @@ impl Sheet {
                 self.move_right(MoveBy::Cell(1));
                 Transition::None // TODO: selection change
             },
-            /*
-            (KeyModifiers::SHIFT|KeyModifiers::CONTROL)=>  {
-                Transition::None // TODO: selection change by page
-            },
-            KeyModifiers::CONTROL => {
-                Transition::None // TODO: move by page
-            },
-            */
             _ => Transition::EventPass,
         }
     }
@@ -741,14 +725,6 @@ impl Sheet {
                 self.move_down(MoveBy::Cell(1));
                 Transition::None // TODO: selection change
             },
-            /*
-            (KeyModifiers::SHIFT|KeyModifiers::CONTROL)=>  {
-                Transition::None // TODO: selection change by page
-            },
-            KeyModifiers::CONTROL => {
-                Transition::None // TODO: move by page
-            },
-            */
             _ => Transition::EventPass,
         }
     }
@@ -768,14 +744,6 @@ impl Sheet {
                 self.move_up(MoveBy::Cell(1));
                 Transition::None // TODO: selection change
             },
-            /*
-            (KeyModifiers::SHIFT|KeyModifiers::CONTROL)=>  {
-                Transition::None // TODO: selection change by page
-            },
-            KeyModifiers::CONTROL => {
-                Transition::None // TODO: move by page
-            },
-            */
             _ => Transition::EventPass,
         }
     }
