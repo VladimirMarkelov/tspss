@@ -97,16 +97,17 @@ impl Arg {
             _ => self.title(),
         }
     }
-    pub fn in_range(&self, col: usize, row: usize) -> bool {
-        match self {
-            Arg::Rng(_, v) => if v.len() == 1 {
-                v[0].col == col && v[0].row == row
-            } else {
-                v[0].col >= col && v[0].row >= row && v[1].col <= col && v[1].row <= row
-            },
-            _ => false,
-        }
-    }
+    // TODO: remove?
+    // pub fn in_range(&self, col: usize, row: usize) -> bool {
+    //     match self {
+    //         Arg::Rng(_, v) => if v.len() == 1 {
+    //             v[0].col == col && v[0].row == row
+    //         } else {
+    //             v[0].col >= col && v[0].row >= row && v[1].col <= col && v[1].row <= row
+    //         },
+    //         _ => false,
+    //     }
+    // }
     pub fn move_by(&mut self, dcol: isize, drow: isize) {
         if dcol == 0 && drow == 0 {
             return;
@@ -171,8 +172,8 @@ pub struct Pos {
     pub row: usize,
     pub fixed_col: bool,
     pub fixed_row: bool,
-    pub full_col: bool,
-    pub full_row: bool,
+    pub full_col: bool, // TODO: support in formulae
+    pub full_row: bool, // TODO: support in formulae
 }
 
 impl Default for Pos {

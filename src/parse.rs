@@ -386,7 +386,6 @@ pub fn parse_string(s: &str) -> Result<(&str, String)> {
         return Err(anyhow!("No opening quote mark: '{}'", s));
     }
     let mut ss = String::new();
-    let mut base = String::new();
     loop {
         let (st_in, base) = parse_while(st, |c| c != '"');
         ss += &base;

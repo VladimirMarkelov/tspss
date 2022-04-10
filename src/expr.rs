@@ -211,7 +211,7 @@ impl Expr {
         for _i in 0..cnt {
             let arg = self.stk.pop().ok_or(anyhow!("empty stack"))?;
             match arg {
-                Arg::Rng(_, v) => {
+                Arg::Rng(_, v) => { // TODO: support open range
                     let (start_col, start_row, end_col, end_row) = if v.len() == 1 {
                         (v[0].col, v[0].row, v[0].col, v[0].row)
                     } else {

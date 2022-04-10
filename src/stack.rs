@@ -52,7 +52,6 @@ fn is_bin_op(arg: &Arg) -> bool {
 
 fn lookup_func_arg(args: &[Arg], idx: usize) -> bool {
     let mut lvl = 0;
-    let mut cnt = 0;
     for arg in args.iter().skip(idx) {
         match arg {
             Arg::OBracket(_) => lvl += 1,
