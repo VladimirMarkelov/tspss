@@ -441,8 +441,12 @@ pub fn parse_arg(s: &str) -> Result<(&str, Arg)> {
     }
     let (st, id) = parse_while(s, |c| ('a'..='z').contains(&c) || ('A'..='Z').contains(&c) || c == '$');
     if !id.is_empty() {
-        let (st, rng) = parse_range(s)?;
-        return Ok((st, Arg::Rng(rng)));
+        let (st, rng, sheet_name) = parse_full_range(s)?;
+        if sheet_name.is_empty() {
+            return Ok((st, Arg::Rng(None, rng)));
+        } else {
+            return Ok((st, Arg::Rng(Some(sheet_name), rng)));
+        }
     }
     let (st, op) = parse_any_literal(s, &["<>", "<=", ">=", "<", ">", "="]);
     if !op.is_empty() {

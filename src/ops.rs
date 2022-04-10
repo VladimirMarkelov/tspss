@@ -20,7 +20,7 @@ pub enum Arg {
     CBracket(String),
     // CBracket, CSqBracket,
     Str(String),
-    Rng(Vec<Pos>),
+    Rng(Option<String>, Vec<Pos>), // TODO: support sheet_name in expressions
     Number(f64),
     Func(String, usize), // Name, number or arguments
     Bool(bool),
@@ -62,7 +62,7 @@ impl Arg {
         match self {
             Arg::End => String::new(),
             Arg::Op(s)| Arg::Eq(s)| Arg::OBracket(s)| Arg::CBracket(s)| Arg::Str(s) => s.to_string(),
-            Arg::Rng(v) => if v.len() == 1 {
+            Arg::Rng(_, v) => if v.len() == 1 {
                 let col_fixed = if v[0].fixed_col { "$" } else { "" };
                 let row_fixed = if v[0].fixed_row { "$" } else { "" };
                 format!("{}{}{}{}", col_fixed, idx_to_name(v[0].col), row_fixed, v[0].row+1)
@@ -99,7 +99,7 @@ impl Arg {
     }
     pub fn in_range(&self, col: usize, row: usize) -> bool {
         match self {
-            Arg::Rng(v) => if v.len() == 1 {
+            Arg::Rng(_, v) => if v.len() == 1 {
                 v[0].col == col && v[0].row == row
             } else {
                 v[0].col >= col && v[0].row >= row && v[1].col <= col && v[1].row <= row
@@ -112,7 +112,7 @@ impl Arg {
             return;
         }
         match self {
-            Arg::Rng(v) => {
+            Arg::Rng(_, v) => {
                 let mut vnew: Vec<Pos> = Vec::new();
                 let mut changed = false;
                 for mut pos in v.iter().cloned() {
@@ -129,7 +129,7 @@ impl Arg {
                     vnew.push(pos);
                 }
                 if changed {
-                    std::mem::swap(self, &mut Arg::Rng(vnew));
+                    std::mem::swap(self, &mut Arg::Rng(None, vnew));
                 }
             },
             _ => {},
@@ -140,7 +140,7 @@ impl Arg {
             return;
         }
         match self {
-            Arg::Rng(v) => {
+            Arg::Rng(_, v) => {
                 let mut vnew: Vec<Pos> = Vec::new();
                 let mut changed = false;
                 for mut pos in v.iter().cloned() {
@@ -157,7 +157,7 @@ impl Arg {
                     vnew.push(pos);
                 }
                 if changed {
-                    std::mem::swap(self, &mut Arg::Rng(vnew));
+                    std::mem::swap(self, &mut Arg::Rng(None, vnew));
                 }
             },
             _ => {},

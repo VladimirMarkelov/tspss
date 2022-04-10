@@ -22,7 +22,7 @@ impl Expr {
     pub fn calculate(&mut self, args: &[Arg], sheet: &mut Sheet) -> Result<Arg> {
         for arg in args {
             match arg {
-                Arg::Number(_) | Arg::Bool(_) | Arg::Str(_) | Arg::Rng(_) => {
+                Arg::Number(_) | Arg::Bool(_) | Arg::Str(_) | Arg::Rng(_, _) => {
                     self.stk.push(arg.clone());
                     continue;
                 },
@@ -44,7 +44,7 @@ impl Expr {
 
     fn single_cell(&mut self, sheet: &mut Sheet, arg: Arg) -> Result<Arg> {
         match arg {
-            Arg::Rng(ref v) => {
+            Arg::Rng(_, ref v) => {
                 info!("single cell: {:?}", v);
                 if v.len() != 1 {
                     return Err(anyhow!("cannot get a cell from a range {:?}", arg));
@@ -211,7 +211,7 @@ impl Expr {
         for _i in 0..cnt {
             let arg = self.stk.pop().ok_or(anyhow!("empty stack"))?;
             match arg {
-                Arg::Rng(v) => {
+                Arg::Rng(_, v) => {
                     let (start_col, start_row, end_col, end_row) = if v.len() == 1 {
                         (v[0].col, v[0].row, v[0].col, v[0].row)
                     } else {

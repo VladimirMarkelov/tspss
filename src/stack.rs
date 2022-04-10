@@ -63,7 +63,7 @@ fn lookup_func_arg(args: &[Arg], idx: usize) -> bool {
             } else {
                 lvl -= 1;
             },
-            Arg::Func(_,_) | Arg::Number(_) | Arg::Str(_) | Arg::Rng(_) => return true,
+            Arg::Func(_,_) | Arg::Number(_) | Arg::Str(_) | Arg::Rng(_, _) => return true,
             _ => {},
         }
     }
@@ -83,7 +83,7 @@ pub fn expr_to_stack(args: &[Arg]) -> Result<Vec<Arg>> {
                 stack.push(arg.clone());
                 is_last_op = true;
             },
-            Arg::Number(_) | Arg::Str(_) | Arg::Rng(_) => {
+            Arg::Number(_) | Arg::Str(_) | Arg::Rng(_, _) => {
                 expr.push(arg.clone());
                 is_last_op = false;
             },
@@ -211,7 +211,7 @@ mod stack_test {
                 val: "sum(-234+A5,57)*20%-8", err: false,
                 res: vec![
                     Arg::Number(234.0), Arg::Op("----".to_string()),
-                    Arg::Rng(vec![Pos{col:0, row: 4, fixed_row: false, fixed_col: false, full_col: false, full_row: false}]),
+                    Arg::Rng(_, vec![Pos{col:0, row: 4, fixed_row: false, fixed_col: false, full_col: false, full_row: false}]),
                     Arg::Op("+".to_string()), Arg::Number(57.0), Arg::Func("sum".to_string(), 2),
                     Arg::Number(20.0), Arg::Op("%".to_string()), Arg::Op("*".to_string()),
                     Arg::Number(8.0), Arg::Op("-".to_string()),
