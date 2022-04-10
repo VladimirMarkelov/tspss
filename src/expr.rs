@@ -1,8 +1,9 @@
 use std::collections::HashMap;
+use std::ops::Bound::Included;
 
 use anyhow::{anyhow, Result};
 
-use crate::ops::{Arg, NEG_SIGN, POS_SIGN, pos_to_id};
+use crate::ops::{Arg, NEG_SIGN, POS_SIGN, pos_to_id, id_to_pos};
 use crate::sheet::{Sheet};
 use crate::stack::{str_expr_to_vec, expr_to_stack};
 
@@ -18,7 +19,6 @@ impl Default for Expr {
 }
 
 impl Expr {
-    // TODO: nested formulae
     pub fn calculate(&mut self, args: &[Arg], sheet: &mut Sheet) -> Result<Arg> {
         for arg in args {
             match arg {
@@ -198,7 +198,44 @@ impl Expr {
         Ok(())
     }
     fn calc_func(&mut self, name: &str, cnt: usize, sheet: &mut Sheet) -> Result<()> {
-        Err(anyhow!("unimplemented"))
+        match name.to_lowercase().as_str() {
+            "sum" => self.sum(cnt, sheet),
+            _ => Err(anyhow!("unimplemented")),
+        }
+    }
+    fn sum(&mut self, cnt: usize, sheet: &mut Sheet) -> Result<()> {
+        if cnt == 0 {
+            return Err(anyhow!("SUM requires at least one argument"));
+        }
+        let mut sum: f64 = 0.0;
+        for _i in 0..cnt {
+            let arg = self.stk.pop().ok_or(anyhow!("empty stack"))?;
+            match arg {
+                Arg::Rng(v) => {
+                    let (start_col, start_row, end_col, end_row) = if v.len() == 1 {
+                        (v[0].col, v[0].row, v[0].col, v[0].row)
+                    } else {
+                        (v[0].col, v[0].row, v[1].col, v[1].row)
+                    };
+                    let st_id = pos_to_id(start_col, start_row);
+                    let en_id = pos_to_id(end_col, end_row);
+                    for (&id, val) in sheet.cells.range((Included(&st_id), Included(&en_id))) {
+                        let (col, _row) = id_to_pos(id);
+                        if col < start_col || col > end_col {
+                            continue;
+                        }
+                        if let Ok(n) = try_to_num(val.calculated.clone()) {
+                            sum += n;
+                        }
+                    }
+                },
+                _ => if let Ok(n) = try_to_num(arg) {
+                    sum += n;
+                },
+            }
+        }
+        self.stk.push(Arg::Number(sum));
+        Ok(())
     }
 }
 
