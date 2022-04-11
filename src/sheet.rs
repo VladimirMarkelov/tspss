@@ -1169,7 +1169,7 @@ impl Sheet {
                 if let Some(mut c) = cell {
                     let bcol = if after { self.cursor.col+1} else {self.cursor.col};
                     if c.is_expr() {
-                        let expr = self.move_expression(&c.val, cnt as isize, 0, bcol, self.cursor.row);
+                        let expr = self.move_expression(&c.val, cnt as isize, 0, bcol, MAX_ROWS);
                         info!("updated expr '{}' : '{}'", expr, c.val);
                         c.val = expr;
                         c.calculated = Arg::End;
@@ -1180,6 +1180,38 @@ impl Sheet {
             }
         }
         self.max_col += cnt;
+        self.recalc_cells();
+        self.dirty = true;
+    }
+    pub fn insert_rows(&mut self, from: usize, cnt: usize, after: bool) {
+        if cnt == 0 || from+cnt >= MAX_ROWS { // TODO: error on >MAX_ROWS?
+            return;
+        }
+        info!("shifting {} rows from {} to {}(cols: {})", cnt, from, self.max_row, self.max_col);
+        for row in (from..=self.max_row).rev() {
+            for col in 0..=self.max_col {
+                let id = pos_to_id(col, row);
+                let new_id = pos_to_id(col, row+cnt);
+                info!("moving from {}x{} to {}x{}", col, row, col, row+cnt);
+                let mut cell: Option<Cell> = if let Some(v) = self.cells.get(&id) {
+                    Some(v.clone())
+                } else {
+                    None
+                };
+                if let Some(mut c) = cell {
+                    let brow = if after { self.cursor.row+1} else {self.cursor.row};
+                    if c.is_expr() {
+                        let expr = self.move_expression(&c.val, 0, cnt as isize, MAX_COLS, brow);
+                        info!("updated expr '{}' : '{}'", expr, c.val);
+                        c.val = expr;
+                        c.calculated = Arg::End;
+                    }
+                    self.cells.insert(new_id, c);
+                    self.cells.insert(id, Cell::default());
+                }
+            }
+        }
+        self.max_row += cnt;
         self.recalc_cells();
         self.dirty = true;
     }
