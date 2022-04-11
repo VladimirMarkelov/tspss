@@ -777,8 +777,8 @@ mod parse_test {
             Tst{st: "\"abc", rs: Arg::Number(0.0), err: true},
             Tst{st: "@abc", rs: Arg::Number(0.0), err: true},
 
-            Tst{st: "jf", rs: Arg::Rng(vec![Pos{full_col: true, col: 265, ..Pos::default()}]), err: false},
-            Tst{st: "$b2", rs: Arg::Rng(vec![Pos{fixed_col: true,col:1,row:1, ..Pos::default()}]), err: false},
+            Tst{st: "jf", rs: Arg::Rng(None, vec![Pos{full_col: true, col: 265, ..Pos::default()}]), err: false},
+            Tst{st: "$b2", rs: Arg::Rng(None, vec![Pos{fixed_col: true,col:1,row:1, ..Pos::default()}]), err: false},
             Tst{st: "abc.tr(jf)", rs: Arg::Func(String::from("abc.tr"), 0), err: false},
             Tst{st: "+abc.tr(jf)", rs: Arg::Op(String::from("+")), err: false},
             Tst{st: "<>abc.tr(jf)", rs: Arg::Eq(String::from("<>")), err: false},
@@ -815,7 +815,7 @@ mod parse_test {
                 args: vec![
                     Arg::Func(String::from("fn.a"), 0),
                     Arg::OBracket(String::from("(")),
-                    Arg::Rng(vec![
+                    Arg::Rng(None, vec![
                         Pos{col:0,row:0,..Pos::default()},
                         Pos{col:1,row:1,..Pos::default()},
                     ]),
@@ -823,7 +823,7 @@ mod parse_test {
                     Arg::Number(4.0),
                     Arg::CBracket(String::from(")")),
                     Arg::Op(String::from("+")),
-                    Arg::Rng(vec![Pos{col:0,row:0,..Pos::default()}]),
+                    Arg::Rng(None, vec![Pos{col:0,row:0,..Pos::default()}]),
                     Arg::Op(String::from("*")),
                     Arg::Number(4.5),
                     Arg::Op(String::from("%")),
@@ -855,7 +855,7 @@ mod parse_test {
         }
     }
     #[test]
-    fn range_move() {
+    fn copy_paste_move() {
         struct Tst {
             base: &'static str,
             res: &'static str,
@@ -873,13 +873,13 @@ mod parse_test {
         for test in tests {
             let r = parse_arg(test.base);
             let (_st, mut val) = r.unwrap();
-            val.move_by(test.dcol, test.drow);
+            val.move_by(test.dcol, test.drow, 0, 0);
             let title = val.title();
             assert_eq!(title.as_str(), test.res, "{:?}", val);
         }
     }
     #[test]
-    fn range_shift() {
+    fn insert_move() {
         struct Tst {
             st: &'static str,
             res: &'static str,
@@ -900,7 +900,7 @@ mod parse_test {
         for test in tests {
             let r = parse_arg(test.st);
             let (_st, mut val) = r.unwrap();
-            val.shift_range(test.bcol, test.brow, test.dcol, test.drow);
+            val.move_by(test.dcol, test.drow, test.bcol, test.brow);
             let title = val.title();
             assert_eq!(title.as_str(), test.res, "{:?}", val);
         }

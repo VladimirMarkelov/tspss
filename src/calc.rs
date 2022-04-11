@@ -630,6 +630,45 @@ impl Calc {
                 self.sheets.push(sheet);
                 self.sheet = self.sheets.len() - 1;
             },
+            "insertcol" => {
+                let mut sheet = &mut self.sheets[self.sheet];
+                let mut from = sheet.cursor.col;
+                let mut after = false;
+                let args = args.trim();
+                let cnt = match args.find(' ') {
+                    None => match args.to_lowercase().as_str() {
+                        "after" => {
+                            after = true;
+                            from += 1;
+                            1
+                        },
+                        "" => 1,
+                        _ => match args.parse::<usize>() {
+                            Err(e) => { self.err = Some(format!("{} is not a number", args)); 0 },
+                            Ok(n) => n,
+                        },
+                    },
+                    Some(idx) => {
+                        match &args[..idx] {
+                            "after" => {
+                                after = true;
+                                from += 1;
+                            },
+                            _ => {
+                                self.err = Some("command format: insertcol ['after'] count".to_string());
+                                return Transition::None;
+                            },
+                        }
+                        let cnt_str = args[idx..].trim();
+                        match cnt_str.parse::<usize>() {
+                            Err(e) => { self.err = Some(format!("{} is not a number", args)); 0},
+                            Ok(n) => n,
+                        }
+                    },
+                };
+                info!("inserting {} cols from {}", cnt, from);
+                sheet.insert_cols(from, cnt, after);
+            },
             _ => {
                 self.err = Some(format!("invalid command '{}'", command));
                 info!("Invalid command: {}", command);

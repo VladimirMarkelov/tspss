@@ -475,6 +475,12 @@ impl Sheet {
         expr.calculate(&args, self)
     }
     pub fn set_cell_calc_value(&mut self, col: usize, row: usize, val: Result<Arg>) {
+        if col > self.max_col {
+            self.max_col = col;
+        }
+        if row > self.max_row {
+            self.max_row = row;
+        }
         let id = pos_to_id(col, row);
         if let Some(cell) = self.cells.get_mut(&id) {
             match val {
@@ -488,6 +494,12 @@ impl Sheet {
         }
     }
     pub fn set_cell_text(&mut self, col: usize, row: usize, text: &str, recalc: bool) {
+        if col > self.max_col {
+            self.max_col = col;
+        }
+        if row > self.max_row {
+            self.max_row = row;
+        }
         let id = pos_to_id(col, row);
         let text = text.trim();
         {
@@ -1098,8 +1110,8 @@ impl Sheet {
                             if !clone.is_expr() {
                                 self.cells.insert(new_id, clone);
                             } else {
-                                let expr = self.move_expression(&cell.val, dcol, drow);
-                                info!("updated expr {} : {}", expr, cell.val);
+                                let expr = self.move_expression(&cell.val, dcol, drow, 0, 0);
+                                info!("updated expr '{}' : '{}'", expr, cell.val);
                                 clone.val = expr;
                                 clone.calculated = Arg::End;
                                 self.cells.insert(new_id, clone);
@@ -1114,7 +1126,7 @@ impl Sheet {
             }
         }
     }
-    fn move_expression(&self, expr: &str, dcol: isize, drow: isize) -> String {
+    fn move_expression(&self, expr: &str, dcol: isize, drow: isize, bcol: usize, brow: usize) -> String {
         let mut ex: &str = &expr["=".len()..];
         let mut output: String = String::from("=");
         loop {
@@ -1132,12 +1144,44 @@ impl Sheet {
                     if let Arg::End = a {
                         break;
                     }
-                    a.move_by(dcol, drow);
+                    a.move_by(dcol, drow, bcol, brow);
                     output += &a.to_expr();
                 },
             }
         }
         output
+    }
+    pub fn insert_cols(&mut self, from: usize, cnt: usize, after: bool) {
+        if cnt == 0 || from+cnt >= MAX_COLS { // TODO: error on >MAX_COLS?
+            return;
+        }
+        info!("shifting {} cols from {} to {}(rows: {})", cnt, from, self.max_col, self.max_row);
+        for row in 0..=self.max_row {
+            for col in (from..=self.max_col).rev() {
+                let id = pos_to_id(col, row);
+                let new_id = pos_to_id(col+cnt, row);
+                info!("moving from {}x{} to {}x{}", col, row, col+cnt, row);
+                let mut cell: Option<Cell> = if let Some(v) = self.cells.get(&id) {
+                    Some(v.clone())
+                } else {
+                    None
+                };
+                if let Some(mut c) = cell {
+                    let bcol = if after { self.cursor.col+1} else {self.cursor.col};
+                    if c.is_expr() {
+                        let expr = self.move_expression(&c.val, cnt as isize, 0, bcol, self.cursor.row);
+                        info!("updated expr '{}' : '{}'", expr, c.val);
+                        c.val = expr;
+                        c.calculated = Arg::End;
+                    }
+                    self.cells.insert(new_id, c);
+                    self.cells.insert(id, Cell::default());
+                }
+            }
+        }
+        self.max_col += cnt;
+        self.recalc_cells();
+        self.dirty = true;
     }
     /*
     fn undo() {

@@ -210,7 +210,7 @@ mod stack_test {
                 val: "sum(-234+A5,57)*20%-8", err: false,
                 res: vec![
                     Arg::Number(234.0), Arg::Op("----".to_string()),
-                    Arg::Rng(_, vec![Pos{col:0, row: 4, fixed_row: false, fixed_col: false, full_col: false, full_row: false}]),
+                    Arg::Rng(None, vec![Pos{col:0, row: 4, fixed_row: false, fixed_col: false, full_col: false, full_row: false}]),
                     Arg::Op("+".to_string()), Arg::Number(57.0), Arg::Func("sum".to_string(), 2),
                     Arg::Number(20.0), Arg::Op("%".to_string()), Arg::Op("*".to_string()),
                     Arg::Number(8.0), Arg::Op("-".to_string()),

@@ -108,7 +108,7 @@ impl Arg {
     //         _ => false,
     //     }
     // }
-    pub fn move_by(&mut self, dcol: isize, drow: isize) {
+    pub fn move_by(&mut self, dcol: isize, drow: isize, bcol: usize, brow: usize) {
         if dcol == 0 && drow == 0 {
             return;
         }
@@ -117,40 +117,12 @@ impl Arg {
                 let mut vnew: Vec<Pos> = Vec::new();
                 let mut changed = false;
                 for mut pos in v.iter().cloned() {
-                    if !pos.fixed_col && dcol != 0 {
+                    if !pos.fixed_col && dcol != 0 && pos.col >= bcol {
                         let newcol = pos.col as isize + dcol;
                         pos.col = if newcol < 0 { 0 } else { newcol as usize};
                         changed = true;
                     }
-                    if !pos.fixed_row && drow != 0 {
-                        let newrow = pos.row as isize + drow;
-                        pos.row = if newrow < 0 { 0 } else { newrow as usize};
-                        changed = true;
-                    }
-                    vnew.push(pos);
-                }
-                if changed {
-                    std::mem::swap(self, &mut Arg::Rng(None, vnew));
-                }
-            },
-            _ => {},
-        }
-    }
-    pub fn shift_range(&mut self, base_col: usize, base_row: usize, dcol: isize, drow: isize) {
-        if dcol == 0 && drow == 0 {
-            return;
-        }
-        match self {
-            Arg::Rng(_, v) => {
-                let mut vnew: Vec<Pos> = Vec::new();
-                let mut changed = false;
-                for mut pos in v.iter().cloned() {
-                    if !pos.fixed_col && dcol != 0 && pos.col >= base_col {
-                        let newcol = pos.col as isize + dcol;
-                        pos.col = if newcol < 0 { 0 } else { newcol as usize};
-                        changed = true;
-                    }
-                    if !pos.fixed_row && drow != 0 && pos.row >= base_row {
+                    if !pos.fixed_row && drow != 0 && pos.row >= brow {
                         let newrow = pos.row as isize + drow;
                         pos.row = if newrow < 0 { 0 } else { newrow as usize};
                         changed = true;
