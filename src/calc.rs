@@ -14,7 +14,7 @@ use crate::ui::{Widget,Context,Transition,NOTHING,MAIN_WIDGET,Dialog,PageListArg
 use crate::edit::Edit;
 use crate::strs;
 use crate::sheet::{Sheet, CalcMode, VERSION, Align, SelectType};
-use crate::parse::{Range, idx_to_name, MAX_COLS, MAX_ROWS, DEF_NUM_WIDTH};
+use crate::parse::{Range, idx_to_name, MAX_COLS, MAX_ROWS, DEF_NUM_WIDTH, is_white};
 use crate::ops::{err_msg};
 
 const MAX_PAGES: usize = 100; // TODO:
@@ -528,18 +528,59 @@ impl Calc {
         self.sheet = 0;
         self.gen = 0;
     }
-    // Returns true if the application must be closes
-    fn run_command(&mut self, cmd: &str) -> Transition { // true if app must close // TODO: enum?
-        let cmd = cmd.trim();
-        let (command, args) = match cmd.find(' ') {
-            None => (&cmd[..], ""),
-            Some(idx) => (&cmd[..idx], &cmd[idx+1..]),
+
+    fn parse_cmd_skip_white<'a>(&self, cmd: &'a str) -> &'a str {
+        match cmd.find(|c| !is_white(c)) {
+            None => cmd,
+            Some(idx) => &cmd[idx..],
+        }
+    }
+    fn parse_cmd_any_str<'a>(&self, cmd: &'a str) -> (&'a str, &'a str) {
+        match cmd.find(' ') {
+            None => (&cmd[cmd.len()..], cmd),
+            Some(idx) => (self.parse_cmd_skip_white(&cmd[idx..]), &cmd[..idx]),
+        }
+    }
+    fn parse_cmd_one_of<'a, F>(&self, cmd: &'a str, vals: F) -> (&'a str, &'a str)
+        where F: Fn(&str) -> bool
+    {
+        match cmd.find(' ') {
+            None => if vals(cmd) {
+                (&cmd[cmd.len()..], cmd)
+            } else {
+                (cmd, &cmd[..0])
+            },
+            Some(idx) => if vals(&cmd[..idx]) {
+                info!("ARG: [{}]", &cmd[..idx]);
+                (self.parse_cmd_skip_white(&cmd[idx..]), &cmd[..idx])
+            } else {
+                (cmd, &cmd[..0])
+            },
+        }
+    }
+    fn parse_cmd_int<'a>(&self, cmd: &'a str) -> (&'a str, Option<usize>) {
+        if cmd.is_empty() {
+            return (cmd, None);
+        }
+        let (st, s) = match cmd.find(' ') {
+            None => (&cmd[cmd.len()..], cmd.parse::<usize>()),
+            Some(idx) => (&cmd[idx..], (&cmd[..idx]).parse::<usize>()),
         };
-        match command.to_lowercase().as_str() {
+        match s {
+            Err(_) => (cmd, None),
+            Ok(n) => (self.parse_cmd_skip_white(st), Some(n)),
+        }
+    }
+    // Returns true if the application must be closed
+    fn run_command(&mut self, args: &str) -> Transition { // true if app must close // TODO: enum?
+        let lowcase = args.trim().to_lowercase();
+        let args = lowcase.as_str();
+        let (args, command) = self.parse_cmd_any_str(args);
+        match command {
             "reset" => self.reset(),
             // "clear" // TODO: reset only the current page
             "save" | "s" => { // TODO: only "save"?
-                let path = args.trim();
+                let (args, path) = self.parse_cmd_any_str(args);
                 if path.is_empty() { // TODO: allow empty if the file was already saved or loaded
                     self.err = Some("empty file path".to_string());
                     return Transition::None;
@@ -551,7 +592,7 @@ impl Calc {
                 }
             },
             "load" | "l" => { // TODO: only "load"?
-                let path = args.trim();
+                let (args, path) = self.parse_cmd_any_str(args);
                 if path.is_empty() { // TODO: allow empty to reload
                     self.err = Some("empty file path".to_string());
                     return Transition::None;
@@ -572,27 +613,42 @@ impl Calc {
             "q!" | "quit!" => {
                 return Transition::Exit;
             },
-            "fixrow" => {
+            "fix" => {
+                let (args, what) = self.parse_cmd_one_of(args, |s| s=="row" || s=="col" || s=="column");
+                info!("ARGS: [{}], WHAT: [{}]", args, what);
                 let sheet = &mut self.sheets[self.sheet];
-                let row = sheet.cursor.row;
-                if let Err(e) = sheet.fix_row(row + 1) {
-                    self.err = Some(e.to_string());
+                match what {
+                    "row" => {
+                        let row = sheet.cursor.row;
+                        if let Err(e) = sheet.fix_row(row + 1) {
+                            self.err = Some(e.to_string());
+                        }
+                    },
+                    "col" | "column" => {
+                        let col = sheet.cursor.col;
+                        if let Err(e) = sheet.fix_col(col + 1) {
+                            self.err = Some(e.to_string());
+                        }
+                    },
+                    _ => {
+                        self.err = Some(String::from("command format: 'fix row|col'"));
+                    },
                 }
             },
-            "fixcol" => {
+            "nofix" => {
+                let (args, what) = self.parse_cmd_one_of(args, |s| s=="row" || s=="col" || s=="column");
                 let sheet = &mut self.sheets[self.sheet];
-                let col = sheet.cursor.col;
-                if let Err(e) = sheet.fix_col(col + 1) {
-                    self.err = Some(e.to_string());
+                match what {
+                    "row" => {
+                        sheet.unfix_row();
+                    },
+                    "col" | "column" => {
+                        sheet.unfix_col();
+                    },
+                    _ => {
+                        self.err = Some(String::from("command format: 'nofix row|col'"));
+                    },
                 }
-            },
-            "nofixrow" => {
-                let sheet = &mut self.sheets[self.sheet];
-                sheet.unfix_row();
-            },
-            "nofixcol" => {
-                let sheet = &mut self.sheets[self.sheet];
-                sheet.unfix_col();
             },
             "newpage" => {
                 {
@@ -630,83 +686,36 @@ impl Calc {
                 self.sheets.push(sheet);
                 self.sheet = self.sheets.len() - 1;
             },
-            "insertcol" => {
-                let mut sheet = &mut self.sheets[self.sheet];
-                let mut from = sheet.cursor.col;
-                let mut after = false;
+            "insert" => {
                 let args = args.trim();
-                let cnt = match args.find(' ') {
-                    None => match args.to_lowercase().as_str() {
-                        "after" => {
-                            after = true;
-                            from += 1;
-                            1
-                        },
-                        "" => 1,
-                        _ => match args.parse::<usize>() {
-                            Err(e) => { self.err = Some(format!("{} is not a number", args)); 0 },
-                            Ok(n) => n,
-                        },
-                    },
-                    Some(idx) => {
-                        match &args[..idx] {
-                            "after" => {
-                                after = true;
-                                from += 1;
-                            },
-                            _ => {
-                                self.err = Some("command format: insertcol ['after'] count".to_string());
-                                return Transition::None;
-                            },
-                        }
-                        let cnt_str = args[idx..].trim();
-                        match cnt_str.parse::<usize>() {
-                            Err(e) => { self.err = Some(format!("{} is not a number", args)); 0},
-                            Ok(n) => n,
-                        }
+                let (args, what) = self.parse_cmd_one_of(args, |s| s=="row" || s=="col" || s=="column");
+                if what.is_empty() {
+                    self.err = Some(String::from("command format: insert column|row [before|after] [count]"));
+                    return Transition::None;
+                }
+                let mut after = false;
+                let (args, from_pos) = self.parse_cmd_one_of(args, |s| s=="before" || s=="after");
+                let after = from_pos == "after";
+                let (args, cnt_opt) = self.parse_cmd_int(args);
+                let cnt = match cnt_opt {
+                    Some(n) => n,
+                    None => if !args.is_empty() {
+                        self.err = Some(String::from("command format: insert column|row [before|after] [count]"));
+                        return Transition::None;
+                    } else {
+                        1
                     },
                 };
-                info!("inserting {} cols from {}", cnt, from);
-                sheet.insert_cols(from, cnt, after);
-            },
-            "insertrow" => {
                 let mut sheet = &mut self.sheets[self.sheet];
-                let mut from = sheet.cursor.row;
-                let mut after = false;
-                let args = args.trim();
-                let cnt = match args.find(' ') {
-                    None => match args.to_lowercase().as_str() {
-                        "after" => {
-                            after = true;
-                            from += 1;
-                            1
-                        },
-                        "" => 1,
-                        _ => match args.parse::<usize>() {
-                            Err(e) => { self.err = Some(format!("{} is not a number", args)); 0 },
-                            Ok(n) => n,
-                        },
-                    },
-                    Some(idx) => {
-                        match &args[..idx] {
-                            "after" => {
-                                after = true;
-                                from += 1;
-                            },
-                            _ => {
-                                self.err = Some("command format: insertrow ['after'] count".to_string());
-                                return Transition::None;
-                            },
-                        }
-                        let cnt_str = args[idx..].trim();
-                        match cnt_str.parse::<usize>() {
-                            Err(e) => { self.err = Some(format!("{} is not a number", args)); 0},
-                            Ok(n) => n,
-                        }
-                    },
-                };
-                info!("inserting {} rows from {}", cnt, from);
-                sheet.insert_rows(from, cnt, after);
+                let mut from = if what == "row" { sheet.cursor.row } else { sheet.cursor.col };
+                if after {
+                    from += 1;
+                }
+                info!("inserting {} {}s from {}", cnt, what, from);
+                match what {
+                    "row" => sheet.insert_rows(from, cnt, after),
+                    _ => sheet.insert_cols(from, cnt, after),
+                }
             },
             _ => {
                 self.err = Some(format!("invalid command '{}'", command));

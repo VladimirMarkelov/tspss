@@ -1220,9 +1220,5 @@ impl Sheet {
     }
     fn redo() {
     }
-    fn copy() {
-    }
-    fn paste() {
-    }
     */
 }
