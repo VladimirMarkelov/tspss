@@ -1175,7 +1175,7 @@ impl Sheet {
                         c.calculated = Arg::End;
                     }
                     self.cells.insert(new_id, c);
-                    self.cells.insert(id, Cell::default());
+                    self.cells.remove(&id);
                 }
             }
         }
@@ -1207,11 +1207,79 @@ impl Sheet {
                         c.calculated = Arg::End;
                     }
                     self.cells.insert(new_id, c);
-                    self.cells.insert(id, Cell::default());
+                    self.cells.remove(&id);
                 }
             }
         }
         self.max_row += cnt;
+        self.recalc_cells();
+        self.dirty = true;
+    }
+    pub fn delete_cols(&mut self, from: usize, cnt: usize, after: bool) {
+        if cnt == 0 {
+            return;
+        }
+        info!("shifting {} cols from {} to {}(rows: {})", cnt, from, self.max_col, self.max_row);
+        for row in 0..=self.max_row {
+            for col in from..=self.max_col {
+                let new_id = pos_to_id(col, row);
+                let id = pos_to_id(col+cnt, row);
+                info!("moving from {}x{} to {}x{}", col+cnt, row, col, row);
+                let mut cell: Option<Cell> = if let Some(v) = self.cells.get(&id) {
+                    Some(v.clone())
+                } else {
+                    None
+                };
+                if let Some(mut c) = cell {
+                    let bcol = if after { self.cursor.col+1} else {self.cursor.col};
+                    if c.is_expr() {
+                        let expr = self.move_expression(&c.val, cnt as isize, 0, bcol, MAX_ROWS);
+                        info!("updated expr '{}' : '{}'", expr, c.val);
+                        c.val = expr;
+                        c.calculated = Arg::End;
+                    }
+                    self.cells.insert(new_id, c);
+                    self.cells.remove(&id);
+                } else {
+                    self.cells.remove(&new_id);
+                }
+            }
+        }
+        self.max_col -= cnt;
+        self.recalc_cells();
+        self.dirty = true;
+    }
+    pub fn delete_rows(&mut self, from: usize, cnt: usize, after: bool) {
+        if cnt == 0 {
+            return;
+        }
+        info!("shifting {} rows from {} to {}(cols: {})", cnt, from, self.max_row, self.max_col);
+        for row in from..=self.max_row {
+            for col in 0..=self.max_col {
+                let new_id = pos_to_id(col, row);
+                let id = pos_to_id(col, row+cnt);
+                info!("moving from {}x{} to {}x{}", col, row+cnt, col, row);
+                let mut cell: Option<Cell> = if let Some(v) = self.cells.get(&id) {
+                    Some(v.clone())
+                } else {
+                    None
+                };
+                if let Some(mut c) = cell {
+                    let brow = if after { self.cursor.row+1} else {self.cursor.row};
+                    if c.is_expr() {
+                        let expr = self.move_expression(&c.val, 0, cnt as isize, MAX_COLS, brow);
+                        info!("updated expr '{}' : '{}'", expr, c.val);
+                        c.val = expr;
+                        c.calculated = Arg::End;
+                    }
+                    self.cells.insert(new_id, c);
+                    self.cells.remove(&id);
+                } else {
+                    self.cells.remove(&new_id);
+                }
+            }
+        }
+        self.max_row -= cnt;
         self.recalc_cells();
         self.dirty = true;
     }

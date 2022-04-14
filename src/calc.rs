@@ -717,6 +717,37 @@ impl Calc {
                     _ => sheet.insert_cols(from, cnt, after),
                 }
             },
+            "delete" => {
+                let args = args.trim();
+                let (args, what) = self.parse_cmd_one_of(args, |s| s=="row" || s=="col" || s=="column");
+                if what.is_empty() {
+                    self.err = Some(String::from("command format: delete column|row [before|after] [count]"));
+                    return Transition::None;
+                }
+                let mut after = false;
+                let (args, from_pos) = self.parse_cmd_one_of(args, |s| s=="before" || s=="after");
+                let after = from_pos == "after";
+                let (args, cnt_opt) = self.parse_cmd_int(args);
+                let cnt = match cnt_opt {
+                    Some(n) => n,
+                    None => if !args.is_empty() {
+                        self.err = Some(String::from("command format: delete column|row [before|after] [count]"));
+                        return Transition::None;
+                    } else {
+                        1
+                    },
+                };
+                let mut sheet = &mut self.sheets[self.sheet];
+                let mut from = if what == "row" { sheet.cursor.row } else { sheet.cursor.col };
+                if after {
+                    from += 1;
+                }
+                info!("deleting {} {}s from {}", cnt, what, from);
+                match what {
+                    "row" => sheet.delete_rows(from, cnt, after),
+                    _ => sheet.delete_cols(from, cnt, after),
+                }
+            },
             _ => {
                 self.err = Some(format!("invalid command '{}'", command));
                 info!("Invalid command: {}", command);
